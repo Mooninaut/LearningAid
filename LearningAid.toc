@@ -1,0 +1,13 @@
+## Interface: 30100
+## Title: Learning Aid v1.06 BETA 5
+## Notes: Displays a bar of spells, abilities, tradeskills, mounts or mini-pets you've just learned.  By Jamash (Kil'jaeden-US)
+## SavedVariables: LearningAid_Saved
+## Author: Jamash (Kil'jaeden-US)
+## Version: 1.06b5
+## X-Embeds: Ace3
+## X-Category: Interface Enhancements
+
+embeds.xml
+
+LearningAid.xml
+LearningAid.lua
