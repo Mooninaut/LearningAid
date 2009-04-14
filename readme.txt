@@ -1,4 +1,4 @@
-Learning Aid version 1.06 BETA 5
+Learning Aid version 1.06 RC1
 Written by Jamash (Kil'jaeden US)
 
 http://www.wowinterface.com/downloads/info10622-LearningAid.html
@@ -15,8 +15,8 @@ Learning Aid Window
 
 Action Buttons
   Left- or right-click to perform the action
-  Middle-click to dismiss the icon (dismissing the last icon closes the window)
-
+  Middle-click to dismiss a button (dismissing the only button closes the window)
+  Shift-click on a button to create a chat link or paste the ability name into the macro window
 
 Slash Command Reference
 
@@ -31,37 +31,49 @@ or
 
 Slash Commands
 
-help
+/la
   Print help text to the default chat window
 
-missing
+/la config
+  Open the Learning Aid configuration window
+
+/la missing
   Scan through your action bars to find any spells you have learned
   but not placed on an action bar
 
-close
+/la close
   Close the window
 
-reset
+/la reset
   Reset the window's position to default
 
-lock
+/la lock on
   Lock the window's position so it cannot be dragged
 
-unlock
+/la lock off
+/la unlock
   Unlock the window's position so it can be dragged
+
+/la lock
+  Toggle whether the window is locked
+
+/la tracking [on|off]
+  Set whether /la missing searches for tracking abilities
+
+/la shapeshift [on|off]
+  Set whether /la missing searches for shapeshift forms, stances, auras, presences, etc.
+
+/la macros [on|off]
+  Set whether /la missing searches inside macros for abilities in use
 
 
 Advanced Slash Commands
 
-test
-  test add TYPE INDEX [INDEX ...]
-  test remove TYPE INDEX
-    TYPE is "spell", "MOUNT" or "CRITTER"
+/la test
+  /la test add TYPE INDEX [INDEX ...]
+  /la test remove TYPE INDEX
+    TYPE is "spell", "mount" or "critter"
     INDEX is the number of the spell, mount or minipet you wish to add or remove, counting from 1
 
-debug
-  debug 0
-  debug off
-    Turn debugging output off
-  debug [anything but "0" or "off"]
-    Turn debugging output on
+/la debug
+  Turn debugging output on or off

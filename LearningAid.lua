@@ -1,10 +1,11 @@
--- LearningAid v1.06 BETA 5 by Jamash (Kil'jaeden-US)
+-- LearningAid v1.06 RC1 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
-LearningAid_Saved = {}
+local LA = LearningAid
+--LearningAid_Saved = {}
 
 -- Adapted from SpellBookFrame.lua
-function LearningAid:UpdateButton(button)
+function LA:UpdateButton(button)
   local id = button:GetID();
 
   local name = button:GetName();
@@ -87,7 +88,7 @@ function LearningAid:UpdateButton(button)
   --SpellButton_UpdateSelection(self);
 end
 -- Adapted from SpellBookFrame.lua
-function LearningAid:SpellButton_OnDrag(button) 
+function LA:SpellButton_OnDrag(button) 
   local id = button:GetID();
   if button.kind == BOOKTYPE_SPELL then
     PickupSpell(id, button.kind);
@@ -96,7 +97,7 @@ function LearningAid:SpellButton_OnDrag(button)
   end
 end
 -- Adapted from SpellBookFrame.lua
-function LearningAid:SpellButton_OnEnter(button)
+function LA:SpellButton_OnEnter(button)
   local id = button:GetID();
   local kind = button.kind
   GameTooltip:SetOwner(button, "ANCHOR_RIGHT");
@@ -118,7 +119,7 @@ function LearningAid:SpellButton_OnEnter(button)
   end
 end
 -- Adapted from SpellBookFrame.lua
-function LearningAid:SpellButton_UpdateSelection(button)
+function LA:SpellButton_UpdateSelection(button)
   if button.kind == BOOKTYPE_SPELL then
     local id = button:GetID()
     if IsSelectedSpell(id, BOOKTYPE_SPELL) then
@@ -129,7 +130,7 @@ function LearningAid:SpellButton_UpdateSelection(button)
   end
 end
 -- Adapted from SpellBookFrame.lua
-function LearningAid:SpellButton_OnModifiedClick(spellButton, mouseButton) 
+function LA:SpellButton_OnModifiedClick(spellButton, mouseButton) 
   local id = spellButton:GetID()
   local spellName, subSpellName
   if spellButton.kind == BOOKTYPE_SPELL then
@@ -174,9 +175,11 @@ function LearningAid:SpellButton_OnModifiedClick(spellButton, mouseButton)
     end
   end
 end
-function LearningAid:OnInitialize()
-  self.DebugPrint("LearningAid:OnInitialize()")
+function LA:OnInitialize()
   if not LearningAid_Saved then LearningAid_Saved = {} end
+  self.saved = LearningAid_Saved
+  self:DebugPrint("LearningAid:OnInitialize()")
+  if self.saved.macros == nil then self.saved.macros = true end
   self.titleHeight = 40
   self.width = 170
   self.buttonSpacing = 5
@@ -185,7 +188,7 @@ function LearningAid:OnInitialize()
   self.lockText = "Lock Position"
   self.unlockText = "Unlock Position"
   self.closeText = "Close"
-  self.version = "1.06 BETA 5"
+  self.version = "1.06 RC1"
   local version, build, date, tocversion = GetBuildInfo()
   self.tocVersion = tocversion
   self.companionCache = {}
@@ -199,14 +202,13 @@ function LearningAid:OnInitialize()
   -- create main frame
   local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
   self.frame = frame
-  frame:SetWidth(LearningAid.width)
-  frame:SetHeight(LearningAid.titleHeight)
+  frame:SetWidth(self.width)
+  frame:SetHeight(self.titleHeight)
   frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
   frame:SetMovable(true)
   frame:SetClampedToScreen(true)
---  frame:SetScript("OnEvent", LearningAid.OnEvent)
-  frame:SetScript("OnShow", function () LearningAid:OnShow() end)
-  frame:SetScript("OnHide", function () LearningAid:OnHide() end)
+  frame:SetScript("OnShow", function () self:OnShow() end)
+  frame:SetScript("OnHide", function () self:OnHide() end)
   frame.buttons = {}
   frame.visible = 0
   frame:Hide()
@@ -223,11 +225,11 @@ function LearningAid:OnInitialize()
   frame.titleBar = titleBar
   titleBar:SetPoint("TOPLEFT")
   titleBar:SetPoint("TOPRIGHT")
-  titleBar:SetHeight(LearningAid.titleHeight)
+  titleBar:SetHeight(self.titleHeight)
   titleBar:RegisterForDrag("LeftButton")
   titleBar:EnableMouse()
   titleBar.text = titleBar:CreateFontString("LearningAid_Frame_Title_Text", "OVERLAY", "GameFontNormalLarge")
-  titleBar.text:SetText(LearningAid.titleText)
+  titleBar.text:SetText(self.titleText)
   titleBar.text:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
 
   -- create close button
@@ -240,14 +242,14 @@ function LearningAid:OnInitialize()
   closeButton:SetPushedTexture("Interface/BUTTONS/UI-Panel-MinimizeButton-Down")
   closeButton:SetDisabledTexture("Interface/BUTTONS/UI-Panel-MinimizeButton-Disabled")
   closeButton:SetHighlightTexture("Interface/BUTTONS/UI-Panel-MinimizeButton-Highlight")
-  closeButton:SetScript("OnClick", function () LearningAid:Hide() end)
+  closeButton:SetScript("OnClick", function () self:Hide() end)
 
   -- initialize right-click menu
   self.menuTable = {
     { text = self.lockText, 
-      func = function () LearningAid:ToggleLock() end },
+      func = function () self:ToggleLock() end },
     { text = self.closeText,
-      func = function () LearningAid:Hide() end }
+      func = function () self:Hide() end }
   }
 
   local menu = CreateFrame("Frame", "LearningAid_Menu", titleBar, "UIDropDownMenuTemplate")
@@ -256,7 +258,7 @@ function LearningAid:OnInitialize()
   titleBar:SetScript(
     "OnDragStart",
     function (self, button)
-      if not LearningAid_Saved.locked then
+      if not LA.saved.locked then
         self:GetParent():StartMoving()
       end
     end
@@ -267,8 +269,8 @@ function LearningAid:OnInitialize()
     function (self)
       local parent = self:GetParent()
       parent:StopMovingOrSizing()
-      LearningAid_Saved.x = parent:GetLeft()
-      LearningAid_Saved.y = parent:GetTop()
+      LA.saved.x = parent:GetLeft()
+      LA.saved.y = parent:GetTop()
     end
   )
 
@@ -276,9 +278,9 @@ function LearningAid:OnInitialize()
     "OnMouseUp",
     function (self, button)
       if button == "MiddleButton" then
-        LearningAid:Hide()
+        LA:Hide()
       elseif button == "RightButton" then
-        EasyMenu(LearningAid.menuTable, menu, titleBar, 0, 8, "MENU", LearningAid.menuHideDelay)
+        EasyMenu(LA.menuTable, menu, titleBar, 0, 8, "MENU", LA.menuHideDelay)
       end
     end
   )
@@ -290,15 +292,15 @@ function LearningAid:OnInitialize()
 
   --self:CreateOptionsPanel()
   self.options = {
-    handler = LearningAid,
+    handler = LA,
     type = "group",
     args = {
       lock = {
         name = "Lock Frame",
         desc = "Locks the Learning Aid frame so it cannot by moved by accident",
         type = "toggle",
-        set = function(info, val) LearningAid_Saved.locked = val end,
-        get = function(info) return LearningAid_Saved.locked end,
+        set = function(info, val) if val then self:Lock() else self:Unlock() end end,
+        get = function(info) return self.saved.locked end,
         width = "full",
         order = 1
       },
@@ -306,8 +308,8 @@ function LearningAid:OnInitialize()
         name = "Debug Output",
         desc = "Enables / disables printing debugging information to the chat frame",
         type = "toggle",
-        set = function(info, val) LearningAid_Saved.debug = val end,
-        get = function(info) return LearningAid_Saved.debug end,
+        set = function(info, val) self.saved.debug = val end,
+        get = function(info) return self.saved.debug end,
         width = "full",
         order = 2
       },
@@ -331,8 +333,8 @@ function LearningAid:OnInitialize()
         name = "Find Tracking Abilities",
         desc = "If enabled, Find Missing Abilities will search for Tracking Abilities as well",
         type = "toggle",
-        set = function(info, val) LearningAid_Saved.tracking = val end,
-        get = function(info, val) return LearningAid_Saved.tracking end,
+        set = function(info, val) self.saved.tracking = val end,
+        get = function(info, val) return self.saved.tracking end,
         width = "full",
         order = 5
       },
@@ -340,8 +342,8 @@ function LearningAid:OnInitialize()
         name = "Find Shapeshift Forms",
         desc = "If enabled, Find Missing Abilities will search for forms, auras, stances, presences, etc.",
         type = "toggle",
-        set = function(info, val) LearningAid_Saved.shapeshift = val end,
-        get = function(info, val) return LearningAid_Saved.shapeshift end,
+        set = function(info, val) self.saved.shapeshift = val end,
+        get = function(info, val) return self.saved.shapeshift end,
         width = "full",
         order = 6
       },
@@ -349,26 +351,25 @@ function LearningAid:OnInitialize()
         name = "Search Macros",
         desc = "If enabled, Find Missing Abilities will search macros for spells",
         type = "toggle",
-        set = function(info, val) LearningAid_Saved.macros = val end,
-        get = function(info, val) return LearningAid_Saved.macros end,
+        set = function(info, val) self.saved.macros = val end,
+        get = function(info, val) return self.saved.macros end,
         width = "full",
         order = 7
       },
       unlock = {
         name = "Unlock frame",
         desc = "Unlocks the Learning Aid frame so it can be moved",
-        type = "toggle",
+        type = "execute",
         guiHidden = true,
-        set = function(info, val) LearningAid_Saved.locked = val end,
-        get = function(info) return LearningAid_Saved.locked end
+        func = "Unlock"
       },
---      config = {
---        name = "Configure",
---        desc = "Open the Learning Aid configuration panel",
---        type = "execute",
---        func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
---        guiHidden = true
---      },
+      config = {
+        name = "Configure",
+        desc = "Open the Learning Aid configuration panel",
+        type = "execute",
+        func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
+        guiHidden = true
+      },
       test = {
         type = "group",
         name = "Test",
@@ -450,26 +451,26 @@ function LearningAid:OnInitialize()
     }
   }
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
-  self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", "Learning Aid")
+  self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self.titleText)
   
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
 end
-function LearningAid:ResetFramePosition()
+function LA:ResetFramePosition()
   local frame = self.frame
   frame:ClearAllPoints()
   frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
-  LearningAid_Saved.x = frame:GetLeft()
-  LearningAid_Saved.y = frame:GetTop()
+  self.saved.x = frame:GetLeft()
+  self.saved.y = frame:GetTop()
 end
-function LearningAid:AceSlashCommand(msg)
+function LA:AceSlashCommand(msg)
   LibStub("AceConfigCmd-3.0").HandleCommand(LearningAid, "la", "LearningAidConfig", msg)
 end
-function LearningAid:OnEvent(event, ...)
+function LA:OnEvent(event, ...)
   self:DebugPrint(event, ...)
   LearningAid[event](self, ...)
 end
-function LearningAid:OnEnable()
+function LA:OnEnable()
   self:DebugPrint("LearningAid:OnEnable()")
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
   self:RegisterEvent("COMPANION_LEARNED", "OnEvent")
@@ -487,40 +488,30 @@ function LearningAid:OnEnable()
   self:UpdateSpellBook()
   self:UpdateCompanions()
 end
-function LearningAid:OnDisable()
-  LearningAid:Hide()
+function LA:OnDisable()
+  self:Hide()
 end
---function LearningAid.OnEvent(self, event, ...)
---  LearningAid.DebugPrint("Event "..event)
---  local buttons = self.buttons
---  if event == "PLAYER_REGEN_DISABLED" then
-function LearningAid:PLAYER_REGEN_DISABLED()
+function LA:PLAYER_REGEN_DISABLED()
   self.inCombat = true
   self.frame.closeButton:Disable()
 end
---  elseif event == "PLAYER_REGEN_ENABLED" then
-function LearningAid:PLAYER_REGEN_ENABLED()
+function LA:PLAYER_REGEN_ENABLED()
   self.inCombat = false
   self.frame.closeButton:Enable()
   self:ProcessQueue()
 end
---  elseif (event == "SPELLS_CHANGED") and LearningAid.spellBookCache ~= nil then
-function LearningAid:SPELLS_CHANGED()
+function LA:SPELLS_CHANGED()
   if self.spellBookCache ~= nil then
     if not self:DiffSpellBook() then
-      --self:UpdateSpellBook()
-    --else
       self:DebugPrint("Event SPELLS_CHANGED fired without spell changes")
     end
   end
 end
---  elseif event == "COMPANION_LEARNED" then
-function LearningAid:COMPANION_LEARNED()
+function LA:COMPANION_LEARNED()
   self:DiffCompanions()
   self:UpdateCompanions()
 end
---  elseif event == "COMPANION_UPDATE" then
-function LearningAid:COMPANION_UPDATE()
+function LA:COMPANION_UPDATE()
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -536,8 +527,7 @@ function LearningAid:COMPANION_UPDATE()
     end
   end
 end
---  elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_CLOSE" then
-function LearningAid:TRADE_SKILL_SHOW()
+function LA:TRADE_SKILL_SHOW()
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -551,9 +541,8 @@ function LearningAid:TRADE_SKILL_SHOW()
     end
   end
 end
-LearningAid.TRADE_SKILL_CLOSE = LearningAid.TRADE_SKILL_SHOW
---  elseif event == "SPELL_UPDATE_COOLDOWN" then
-function LearningAid:SPELL_UPDATE_COOLDOWN()
+LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
+function LA:SPELL_UPDATE_COOLDOWN()
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -566,8 +555,7 @@ function LearningAid:SPELL_UPDATE_COOLDOWN()
     end
   end
 end
---  elseif event == "CURRENT_SPELL_CAST_CHANGED" then
-function LearningAid:CURRENT_SPELL_CAST_CHANGED()
+function LA:CURRENT_SPELL_CAST_CHANGED()
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -577,9 +565,7 @@ function LearningAid:CURRENT_SPELL_CAST_CHANGED()
     end
   end
 end
---  elseif event == "UNIT_SPELLCAST_START" then
-function LearningAid:UNIT_SPELLCAST_START(unit, spell)
---    local unit, spell = ...
+function LA:UNIT_SPELLCAST_START(unit, spell)
   if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
     self:DebugPrint("Learning Aid: Talent swap initiated")
     self.retalenting = true
@@ -587,9 +573,7 @@ function LearningAid:UNIT_SPELLCAST_START(unit, spell)
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
   end
 end
---  elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
-function LearningAid:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
---    local unit, spell = ...
+function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
   if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
     self:DebugPrint("Learning Aid: Talent swap canceled")
     self.retalenting = false
@@ -597,45 +581,35 @@ function LearningAid:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
   end
 end
---  elseif event == "PLAYER_TALENT_UPDATE" then
-function LearningAid:PLAYER_TALENT_UPDATE()
+function LA:PLAYER_TALENT_UPDATE()
   self:DebugPrint("Learning Aid: Talent swap completed")
   self.retalenting = false
   self:UnregisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
   self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
 end
---  elseif event == "PLAYER_LEAVING_WORLD" then
-function LearningAid:PLAYER_LEAVING_WORLD()
+function LA:PLAYER_LEAVING_WORLD()
   self:UnregisterEvent("SPELLS_CHANGED", "OnEvent")
   self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnEvent")
 end
---  elseif event == "PLAYER_ENTERING_WORLD" then
-function LearningAid:PLAYER_ENTERING_WORLD()
+function LA:PLAYER_ENTERING_WORLD()
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
 end
---  elseif event == "PLAYER_LOGIN" then
---function LearningAid:PLAYER_LOGIN()
---  self.UpdateSpellBook()
---  self.UpdateCompanions()
---end
---  elseif event == "VARIABLES_LOADED" then
-function LearningAid:VARIABLES_LOADED()
-  if LearningAid_Saved.locked then
+function LA:VARIABLES_LOADED()
+  if self.saved.locked then
     self.menuTable[1].text = self.unlockText
   else
-    LearningAid_Saved.locked = false
+    self.saved.locked = false
   end
-  if LearningAid_Saved.x and LearningAid_Saved.y then
+  if self.saved.x and self.saved.y then
     self.frame:ClearAllPoints()
-    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", LearningAid_Saved.x, LearningAid_Saved.y)
+    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
   end
 end
---end
-function LearningAid:UpdateCompanions()
+function LA:UpdateCompanions()
   self:UpdateCompanionType("MOUNT")
   self:UpdateCompanionType("CRITTER")
 end
-function LearningAid:UpdateCompanionType(kind)
+function LA:UpdateCompanionType(kind)
   self.companionCache[kind] = {}
   local cache = self.companionCache[kind]
   local i = 1
@@ -646,7 +620,7 @@ function LearningAid:UpdateCompanionType(kind)
     creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
   end
 end
-function LearningAid:DiffCompanions()
+function LA:DiffCompanions()
   local updated
   updated = self:DiffCompanionType("MOUNT")
   if updated then
@@ -658,15 +632,15 @@ function LearningAid:DiffCompanions()
     end
   end
 end
-function LearningAid:AddCompanion(kind, id)
-  if LearningAid.inCombat then
-    table.insert(LearningAid.queue, { action = "LEARN", id = id, kind = kind})
+function LA:AddCompanion(kind, id)
+  if self.inCombat then
+    table.insert(self.queue, { action = "LEARN", id = id, kind = kind})
   else
-    LearningAid:LearnSpell(kind, id)
-    LearningAid:AddButton(kind, id)
+    self:LearnSpell(kind, id)
+    self:AddButton(kind, id)
   end
 end
-function LearningAid:DiffCompanionType(kind)
+function LA:DiffCompanionType(kind)
   local i = 1
   local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
   local cache = self.companionCache[kind]
@@ -684,7 +658,7 @@ function LearningAid:DiffCompanionType(kind)
   end
   return updated
 end
-function LearningAid:UpdateSpellBook()
+function LA:UpdateSpellBook()
   self.spellBookCache = {}
   local i = 1
   local spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
@@ -704,7 +678,7 @@ function LearningAid:UpdateSpellBook()
   end
   self:DebugPrint("Updated Spellbook, "..i.." spells found")
 end
-function LearningAid:AddSpell(id)
+function LA:AddSpell(id)
   if self.inCombat then
     table.insert(self.queue, { action = "LEARN", id = id, kind = BOOKTYPE_SPELL })
   else
@@ -715,7 +689,7 @@ function LearningAid:AddSpell(id)
     end
   end
 end
-function LearningAid:RemoveSpell(id)
+function LA:RemoveSpell(id)
   if self.inCombat then
     table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL })
   else
@@ -723,7 +697,7 @@ function LearningAid:RemoveSpell(id)
     self:ForgetSpell(id)
   end
 end
-function LearningAid:ProcessQueue()
+function LA:ProcessQueue()
   if self.inCombat then
     self:DebugPrint("Cannot process action queue during combat in LearningAid:ProcessQueue")
     return
@@ -755,46 +729,45 @@ function LearningAid:ProcessQueue()
       self:DebugPrint("Invalid entry type " .. item.kind .. " in LearningAid:ProcessQueue")
     end
   end
-  LearningAid.queue = {}
+  self.queue = {}
 end
-function LearningAid:DiffSpellBook()
+function LA:DiffSpellBook()
   local i = 1
---  local offset = 0
   local cache = self.spellBookCache
   local updated = false
   local spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-  local spellAbsoluteID = LearningAid:AbsoluteSpellID(i)
+  local spellAbsoluteID = self:AbsoluteSpellID(i)
   while spellName do
     if cache[i] == nil or
        cache[i].absoluteID ~= spellAbsoluteID then
       -- if spell removed
       if cache[i + 1] ~= nil and
          cache[i+1].absoluteID == spellAbsoluteID then
-        LearningAid:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..(i))
-        LearningAid:UpdateSpellBook()
-        LearningAid:RemoveSpell(i)
-      else -- if not removeOnly then
-        LearningAid:DebugPrint("New spell found: "..spellName.." ("..spellRank..")") -- Old spell: "..cache[i + offset].name.." ("..cache[i + offset].rank..")")
-        LearningAid:UpdateSpellBook()
-        LearningAid:AddSpell(i)
+        self:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..(i))
+        self:UpdateSpellBook()
+        self:RemoveSpell(i)
+      else
+        self:DebugPrint("New spell found: "..spellName.." ("..spellRank..")") -- Old spell: "..cache[i + offset].name.." ("..cache[i + offset].rank..")")
+        self:UpdateSpellBook()
+        self:AddSpell(i)
       end
       updated = true
       break
     end
     i = i + 1
     spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-    spellAbsoluteID = LearningAid:AbsoluteSpellID(i)
+    spellAbsoluteID = self:AbsoluteSpellID(i)
   end
   -- if the last spell in the spellbook is removed
   if i == #cache and not updated then
-    LearningAid:DebugPrint("Last spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..i)
-    LearningAid:UpdateSpellBook()
-    LearningAid:RemoveSpell(i)
+    self:DebugPrint("Last spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..i)
+    self:UpdateSpellBook()
+    self:RemoveSpell(i)
     updated = true
   end
   return updated
 end
-function LearningAid:LearnSpell(kind, id)
+function LA:LearnSpell(kind, id)
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -802,11 +775,11 @@ function LearningAid:LearnSpell(kind, id)
     local buttonID = button:GetID()
     if button.kind == kind and buttonID >= id then
       button:SetID(buttonID + 1)
-      LearningAid:UpdateButton(button)
+      self:UpdateButton(button)
     end
   end
 end
-function LearningAid:ForgetSpell(id)
+function LA:ForgetSpell(id)
   local frame = self.frame
   local buttons = frame.buttons
   for i = 1, frame.visible do
@@ -818,7 +791,7 @@ function LearningAid:ForgetSpell(id)
     end
   end
 end
-function LearningAid:CreateButton()
+function LA:CreateButton()
   local frame = self.frame
   local buttons = frame.buttons
   local count = #buttons
@@ -848,18 +821,18 @@ function LearningAid:CreateButton()
       self:ClearButtonIndex(spellButton.index)
     end
   end
-  button.linkSpell = function (...) LearningAid:SpellButton_OnModifiedClick(...) end
+  button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.iconTexture = _G[name.."IconTexture"]
   button.cooldown = _G[name.."Cooldown"]
   return button
 end
-function LearningAid:SpellButton_OnHide(button)
-  LearningAid:DebugPrint("Hiding button "..button.index)
+function LA:SpellButton_OnHide(button)
+  self:DebugPrint("Hiding button "..button.index)
   button:SetChecked(false)
   button.iconTexture:SetVertexColor(1, 1, 1)
   button.cooldown:Hide()
 end
-function LearningAid:AddButton(kind, id)
+function LA:AddButton(kind, id)
   if kind == BOOKTYPE_SPELL then
     if id > #self.spellBookCache or id < 1 then
       self:DebugPrint("LearningAid:AddButton() - Invalid spell ID", id)
@@ -922,7 +895,7 @@ function LearningAid:AddButton(kind, id)
   self:UpdateButton(button)
   frame:Show()
 end
-function LearningAid:ClearButtonID(kind, id)
+function LA:ClearButtonID(kind, id)
   local frame = self.frame
   local buttons = frame.buttons
   local i = 1
@@ -937,7 +910,7 @@ function LearningAid:ClearButtonID(kind, id)
     end
   end
 end
-LearningAid.castSlashCommands = {
+LA.castSlashCommands = {
   [SLASH_USE1] = true,
   [SLASH_USE2] = true,
   [SLASH_USERANDOM1] = true,
@@ -951,17 +924,17 @@ LearningAid.castSlashCommands = {
   [SLASH_CASTSEQUENCE1] = true,
   [SLASH_CASTSEQUENCE2] = true
 }
-function LearningAid:MacroSpells(macroText)
+function LA:MacroSpells(macroText)
   local spells = {}
   local first, last, line
   first, last, line = macroText:find("([^\n]+)[\n]?")
   while first ~= nil do
-    LearningAid:DebugPrint("Line",line)
+    self:DebugPrint("Line",line)
     local lineFirst, lineLast, slash = line:find("^(/%a+)%s+")
     if lineFirst ~= nil then
-      LearningAid:DebugPrint('Slash "'..slash..'"')
-      if LearningAid.castSlashCommands[slash] then
-        --LearningAid:DebugPrint("found slash command")
+      self:DebugPrint('Slash "'..slash..'"')
+      if self.castSlashCommands[slash] then
+        --self:DebugPrint("found slash command")
         local token
         local linePos = lineLast
         local found = true
@@ -987,7 +960,7 @@ function LearningAid:MacroSpells(macroText)
             token = strtrim(token)
             linePos = lineLast
             found = true
-            LearningAid:DebugPrint('Token: "'..token..'"')
+            self:DebugPrint('Token: "'..token..'"')
             spells[token] = true
           end
         end
@@ -997,7 +970,7 @@ function LearningAid:MacroSpells(macroText)
   end
   return spells
 end
-function LearningAid:FindMissingActions()
+function LA:FindMissingActions()
   if self.inCombat then
     print("Learning Aid: Cannot do that in combat.")
     return
@@ -1036,7 +1009,7 @@ function LearningAid:FindMissingActions()
     end
     if actionType == "spell" then
       actions[actionID] = true
-    elseif actionType == "macro" and actionID ~= 0 and LearningAid_Saved.macros then
+    elseif actionType == "macro" and actionID ~= 0 and self.saved.macros then
       self:DebugPrint("Macro in slot", slot, "with ID", actionID)
       local body = GetMacroBody(actionID)
       local spells = self:MacroSpells(body)
@@ -1060,8 +1033,8 @@ function LearningAid:FindMissingActions()
       (not actions[info.spellBookID]) and -- spell is not on any action bar
       (not info.passive)              and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
-      ((not tracking[spellName]) or LearningAid_Saved.tracking) and
-      ((not shapeshift[spellName]) or LearningAid_Saved.shapeshift) and
+      ((not tracking[spellName]) or self.saved.tracking) and
+      ((not shapeshift[spellName]) or self.saved.shapeshift) and
       (not macroSpells[spellName])
     then
       self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
@@ -1074,7 +1047,7 @@ function LearningAid:FindMissingActions()
     self:AddButton(BOOKTYPE_SPELL, results[result].spellBookID)
   end
 end
-function LearningAid:ClearButtonIndex(index)
+function LA:ClearButtonIndex(index)
 -- I have buttons 1 2 3 (4 5)
 -- I remove button 2
 -- I want 1 3 (3 4 5)
@@ -1107,7 +1080,7 @@ function LearningAid:ClearButtonIndex(index)
   buttons[visible]:Hide()
   self:SetVisible(visible - 1)
 end
-function LearningAid:SetVisible(visible)
+function LA:SetVisible(visible)
   frame = self.frame
   frame.visible = visible
   local top, left = frame:GetTop(), frame:GetLeft()
@@ -1118,10 +1091,10 @@ function LearningAid:SetVisible(visible)
     frame:Hide()
   end
 end
-function LearningAid:GetVisible()
+function LA:GetVisible()
   return self.frame.visible
 end
-function LearningAid:Hide()
+function LA:Hide()
   local frame = self.frame
   if not self.inCombat then
     for i = 1, frame.visible do
@@ -1134,7 +1107,7 @@ function LearningAid:Hide()
     table.insert(self.queue, { kind = "HIDE" })
   end
 end
-function LearningAid:TestAdd(kind, ...)
+function LA:TestAdd(kind, ...)
   print("Testing!")
   local t = {...}
   for i = 1, #t do
@@ -1166,7 +1139,7 @@ function LearningAid:TestAdd(kind, ...)
     end
   end
 end
-function LearningAid:TestRemove(kind, ...)
+function LA:TestRemove(kind, ...)
   print("Testing!")
   local t = {...}
   for i = 1, #t do
@@ -1179,42 +1152,42 @@ function LearningAid:TestRemove(kind, ...)
     end
   end
 end
-function LearningAid:DebugPrint(...)
-  if LearningAid_Saved.debug then
+function LA:DebugPrint(...)
+  if self.saved.debug then
     print(...)
   end
 end
-function LearningAid:OnShow()
+function LA:OnShow()
   self:RegisterEvent("COMPANION_UPDATE", "OnEvent")
   self:RegisterEvent("TRADE_SKILL_SHOW", "OnEvent")
   self:RegisterEvent("TRADE_SKILL_CLOSE", "OnEvent")
   self:RegisterEvent("SPELL_UPDATE_COOLDOWN", "OnEvent")
   self:RegisterEvent("CURRENT_SPELL_CAST_CHANGED", "OnEvent")
 end
-function LearningAid:OnHide()
+function LA:OnHide()
   self:UnregisterEvent("COMPANION_UPDATE")
   self:UnregisterEvent("TRADE_SKILL_SHOW")
   self:UnregisterEvent("TRADE_SKILL_CLOSE")
   self:UnregisterEvent("SPELL_UPDATE_COOLDOWN")
   self:UnregisterEvent("CURRENT_SPELL_CAST_CHANGED")
 end
-function LearningAid:Lock()
-    LearningAid_Saved.locked = true
+function LA:Lock()
+    self.saved.locked = true
     self.menuTable[1].text = self.unlockText
 end
-function LearningAid:Unlock()
-    LearningAid_Saved.locked = false
+function LA:Unlock()
+    self.saved.locked = false
     self.menuTable[1].text = self.lockText
 end
-function LearningAid:ToggleLock()
-  if LearningAid_Saved.locked then
+function LA:ToggleLock()
+  if self.saved.locked then
     self:Unlock()
   else
     self:Lock()
   end
 end
 -- Transforms a spellbook ID into an absolute spell ID
-function LearningAid:AbsoluteSpellID(id)
+function LA:AbsoluteSpellID(id)
   local link = GetSpellLink(id, BOOKTYPE_SPELL)
   if link then
     local absoluteID = string.match(link, "Hspell:([^\124]+)\124")
