@@ -1,4 +1,4 @@
--- LearningAid v1.06 RC1 by Jamash (Kil'jaeden-US)
+-- LearningAid v1.06.1 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -188,7 +188,7 @@ function LA:OnInitialize()
   self.lockText = "Lock Position"
   self.unlockText = "Unlock Position"
   self.closeText = "Close"
-  self.version = "1.06 RC1"
+  self.version = "1.06.1"
   local version, build, date, tocversion = GetBuildInfo()
   self.tocVersion = tocversion
   self.companionCache = {}
@@ -955,7 +955,7 @@ function LA:MacroSpells(macroText)
             if lineLast ~= nil then linePos = lineLast; found = true end
           end
           found = false
-          lineFirst, lineLast, token = line:find("^([%a%s']+)", linePos + 1)
+          lineFirst, lineLast, token = line:find("^([%a%s':]+)", linePos + 1)
           if lineLast ~= nil then
             token = strtrim(token)
             linePos = lineLast

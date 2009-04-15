@@ -1,4 +1,4 @@
-Learning Aid version 1.06 RC1
+Learning Aid version 1.06.1
 Written by Jamash (Kil'jaeden US)
 
 http://www.wowinterface.com/downloads/info10622-LearningAid.html
