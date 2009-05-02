@@ -1,4 +1,4 @@
--- LearningAid v1.06.1 by Jamash (Kil'jaeden-US)
+-- LearningAid v1.07 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -177,9 +177,15 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
 end
 function LA:OnInitialize()
   if not LearningAid_Saved then LearningAid_Saved = {} end
+  if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
-  self:DebugPrint("LearningAid:OnInitialize()")
+  self.character = LearningAid_Character
+  self.version = "1.07"
+  self.saved.version = self.version
+  self.character.version = self.version
   if self.saved.macros == nil then self.saved.macros = true end
+  if self.saved.enabled == nil then self.saved.enabled = true end
+  self:DebugPrint("LearningAid:OnInitialize()")
   self.titleHeight = 40
   self.width = 170
   self.buttonSpacing = 5
@@ -188,7 +194,6 @@ function LA:OnInitialize()
   self.lockText = "Lock Position"
   self.unlockText = "Unlock Position"
   self.closeText = "Close"
-  self.version = "1.06.1"
   local version, build, date, tocversion = GetBuildInfo()
   self.tocVersion = tocversion
   self.companionCache = {}
@@ -452,9 +457,18 @@ function LA:OnInitialize()
   }
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self.titleText)
-  
+  hooksecurefunc("ConfirmTalentWipe", function() 
+    print("LearningAid:ConfirmTalentWipe")
+    self:SaveActions()
+    self.untalenting = true
+    self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
+    self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
+    self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
+  end) -- PLACEHOLDER
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
+  self:SetEnabledState(self.saved.enabled)
+  
 end
 function LA:ResetFramePosition()
   local frame = self.frame
@@ -471,6 +485,7 @@ function LA:OnEvent(event, ...)
   LearningAid[event](self, ...)
 end
 function LA:OnEnable()
+  self.saved.enabled = true
   self:DebugPrint("LearningAid:OnEnable()")
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
   self:RegisterEvent("COMPANION_LEARNED", "OnEvent")
@@ -490,6 +505,7 @@ function LA:OnEnable()
 end
 function LA:OnDisable()
   self:Hide()
+  self.saved.enabled = false
 end
 function LA:PLAYER_REGEN_DISABLED()
   self.inCombat = true
@@ -582,10 +598,16 @@ function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
   end
 end
 function LA:PLAYER_TALENT_UPDATE()
-  self:DebugPrint("Learning Aid: Talent swap completed")
-  self.retalenting = false
-  self:UnregisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
-  self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
+  if self.retalenting then
+    self:DebugPrint("Learning Aid: Talent swap completed")
+    self.retalenting = false
+    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
+    self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+  elseif self.untalenting then
+    self.untalenting = false
+    self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
+    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
+  end
 end
 function LA:PLAYER_LEAVING_WORLD()
   self:UnregisterEvent("SPELLS_CHANGED", "OnEvent")
@@ -605,6 +627,37 @@ function LA:VARIABLES_LOADED()
     self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
   end
 end
+
+function LA:ACTIONBAR_SLOT_CHANGED(slot)
+-- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
+-- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
+-- self.savedActions[spec][1] = 2354
+  if self.untalenting then
+    -- something something on (slot)
+    local spec = GetActiveTalentGroup()
+    local actionType, actionID, actionSubType, absoluteID = GetActionInfo(slot)
+    local oldID = self.savedActions[spec][slot]
+    self:DebugPrint("Action Slot "..slot.." changed:",
+      (actionType or "")..",",
+      (actionID or "")..",",
+      (actionSubType or "")..",",
+      (absoluteID or "")..",",
+      (oldID or "")
+    )
+    if oldID and (actionType ~= "spell" or absoluteID ~= oldID) then
+      if not self.character.actions then self.character.actions = {} end
+      if not self.character.actions[spec] then self.character.actions[spec] = {} end
+      self.character.actions[spec][slot] = oldID
+    end
+  end
+end
+function LA:UI_ERROR_MESSAGE()
+  if self.untalenting then
+    self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
+    self:UnregisterEvent("UI_ERROR_MESSAGE")
+    self.untalenting = false
+  end
+end
 function LA:UpdateCompanions()
   self:UpdateCompanionType("MOUNT")
   self:UpdateCompanionType("CRITTER")
@@ -621,16 +674,8 @@ function LA:UpdateCompanionType(kind)
   end
 end
 function LA:DiffCompanions()
-  local updated
-  updated = self:DiffCompanionType("MOUNT")
-  if updated then
-    self:UpdateCompanionType("MOUNT")
-  else
-    updated = self:DiffCompanionType("CRITTER")
-    if updated then
-      self:UpdateCompanionType("CRITTER")
-    end
-  end
+  self:DiffCompanionType("MOUNT")
+  self:DiffCompanionType("CRITTER")
 end
 function LA:AddCompanion(kind, id)
   if self.inCombat then
@@ -649,6 +694,7 @@ function LA:DiffCompanionType(kind)
     if cache[i] == nil or
        cache[i] ~= creatureName then
       self:DebugPrint("Found new companion, type "..kind..", index "..i)
+      self:UpdateCompanionType(kind)
       self:AddCompanion(kind, i)
       updated = true
       break
@@ -776,6 +822,22 @@ function LA:LearnSpell(kind, id)
     if button.kind == kind and buttonID >= id then
       button:SetID(buttonID + 1)
       self:UpdateButton(button)
+    end
+  end
+  local spec = GetActiveTalentGroup()
+  if (not self.retalenting) and
+      kind == BOOKTYPE_SPELL and
+      self.character.actions and
+      self.character.actions[spec] then
+    local absoluteID = self:AbsoluteSpellID(id)
+    for slot, oldID in pairs(self.character.actions[spec]) do
+      local actionType = GetActionInfo(slot)
+      --local actionType, actionID, actionSubType, absoluteID = GetActionInfo(slot)
+      if oldID == absoluteID and actionType == nil then
+        PickupSpell(id, BOOKTYPE_SPELL)
+        PlaceAction(slot)
+        self.character.actions[spec][slot] = nil
+      end
     end
   end
 end
@@ -925,6 +987,7 @@ LA.castSlashCommands = {
   [SLASH_CASTSEQUENCE2] = true
 }
 function LA:MacroSpells(macroText)
+  macroText = string.lower(macroText)
   local spells = {}
   local first, last, line
   first, last, line = macroText:find("([^\n]+)[\n]?")
@@ -1018,6 +1081,22 @@ function LA:FindMissingActions()
       end
     end
   end
+  -- Macaroon support code
+  if self.saved.macros and Macaroon and Macaroon.Buttons then
+    for index, button in ipairs(Macaroon.Buttons) do
+      local buttonType = button[1].config.type
+      local macroText = button[1].config.macro
+      local storage = button[2]
+      if (buttonType == "macro") and (storage == 0) then
+        self:DebugPrint("Macaroon macro in slot", index)
+        local spells = self:MacroSpells(macroText)
+        for spell in pairs(spells) do
+          macroSpells[spell] = true
+        end
+      end
+    end
+  end
+  -- End Macaroon code
   for actionID, info in ipairs(self.spellBookCache) do
     if (not ranks[info.name]) or ranks[info.name].rank < info.rank then
       ranks[info.name] = info
@@ -1029,22 +1108,59 @@ function LA:FindMissingActions()
     shapeshift[formName] = true
   end
   for spellName, info in pairs(ranks) do
+    spellNameLower = string.lower(spellName)
     if 
       (not actions[info.spellBookID]) and -- spell is not on any action bar
       (not info.passive)              and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
       ((not tracking[spellName]) or self.saved.tracking) and
       ((not shapeshift[spellName]) or self.saved.shapeshift) and
-      (not macroSpells[spellName])
+      (not macroSpells[spellNameLower])
     then
       self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      if macroSpells[spellName] then self:DebugPrint("Found spell in macro") end
+      if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
       results[#results + 1] = info
     end
   end
   table.sort(results, function (a, b) return a.spellBookID < b.spellBookID end)
   for result = 1, #results do
     self:AddButton(BOOKTYPE_SPELL, results[result].spellBookID)
+  end
+end
+function LA:SaveActions()
+  local spec = GetActiveTalentGroup()
+  if self.savedActions == nil then self.savedActions = {} end
+  self.savedActions[spec] = {}
+  local savedActions = self.savedActions[spec]
+  for actionSlot = 1, 120 do
+    local actionType, actionID, actionSubType, absoluteID = GetActionInfo(actionSlot)
+    if actionType == "spell" then
+      savedActions[actionSlot] = absoluteID
+    end
+  end
+end
+function LA:RestoreAction(absoluteID)
+  -- OLD AND BUSTED -- savedActions[spec][slot] = absoluteID -- is the new hotness
+  local spec = GetActiveTalentGroup()
+  if self.savedActions and self.savedActions[spec] and self.savedActions[spec][absoluteID] then
+    local actionSlot = self.savedActions[spec][absoluteID]
+    self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at action ID "..actionSlot)
+    --local actionType, actionID, actionSubType, slotAbsoluteID = GetActionInfo(actionSlot)
+    local actionType = GetActionInfo(actionSlot)
+    if actionType == nil then
+      local spellBookID
+      for index, info in ipairs(self.spellBookCache) do
+        if info.absoluteID == absoluteID then
+          spellBookID = info.spellBookID
+          self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at Spellbook ID "..spellBookID)
+          break
+        end
+      end
+      if spellBookID then
+        PickupSpell(spellBookID, BOOKTYPE_SPELL)
+        PlaceAction(actionSlot)
+      end
+    end
   end
 end
 function LA:ClearButtonIndex(index)
@@ -1153,7 +1269,7 @@ function LA:TestRemove(kind, ...)
   end
 end
 function LA:DebugPrint(...)
-  if self.saved.debug then
+  if self.saved.debug and self.saved.enabled then
     print(...)
   end
 end
