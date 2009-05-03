@@ -3,7 +3,18 @@
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
 --LearningAid_Saved = {}
-
+--[[
+local eventFrame = CreateFrame("Frame", nil, UIParent)
+eventFrame:RegisterAllEvents()
+eventFrame:SetScript("OnEvent", function (self, event, ...)
+  local actionType, actionID, actionSubType, absoluteID = GetActionInfo(1)
+  if actionType then
+    print("Action Bar info available at event", event, ...)
+    print(actionType, actionID, actionSubType, absoluteID)
+    eventFrame:UnregisterAllEvents()
+  end
+end)
+--]]
 -- Adapted from SpellBookFrame.lua
 function LA:UpdateButton(button)
   local id = button:GetID();
@@ -459,7 +470,7 @@ function LA:OnInitialize()
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self.titleText)
   hooksecurefunc("ConfirmTalentWipe", function() 
     print("LearningAid:ConfirmTalentWipe")
-    self:SaveActions()
+    self:SaveActionBars()
     self.untalenting = true
     self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
@@ -482,7 +493,9 @@ function LA:AceSlashCommand(msg)
 end
 function LA:OnEvent(event, ...)
   self:DebugPrint(event, ...)
-  LearningAid[event](self, ...)
+  if LearningAid[event] then
+    LearningAid[event](self, ...)
+  end
 end
 function LA:OnEnable()
   self.saved.enabled = true
@@ -500,8 +513,11 @@ function LA:OnEnable()
   --self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
   self:RegisterEvent("UNIT_SPELLCAST_START", "OnEvent")
   self:RegisterEvent("PLAYER_LEAVING_WORLD", "OnEvent")
+  self:RegisterEvent("PLAYER_LOGOUT", "OnEvent")
   self:UpdateSpellBook()
   self:UpdateCompanions()
+  self:DiffActionBars()
+  self:SaveActionBars()
 end
 function LA:OnDisable()
   self:Hide()
@@ -631,12 +647,13 @@ end
 function LA:ACTIONBAR_SLOT_CHANGED(slot)
 -- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
 -- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
--- self.savedActions[spec][1] = 2354
+-- self.character.actions[spec][1] = 2354
+  
   if self.untalenting then
     -- something something on (slot)
     local spec = GetActiveTalentGroup()
     local actionType, actionID, actionSubType, absoluteID = GetActionInfo(slot)
-    local oldID = self.savedActions[spec][slot]
+    local oldID = self.character.actions[spec][slot]
     self:DebugPrint("Action Slot "..slot.." changed:",
       (actionType or "")..",",
       (actionID or "")..",",
@@ -645,9 +662,9 @@ function LA:ACTIONBAR_SLOT_CHANGED(slot)
       (oldID or "")
     )
     if oldID and (actionType ~= "spell" or absoluteID ~= oldID) then
-      if not self.character.actions then self.character.actions = {} end
-      if not self.character.actions[spec] then self.character.actions[spec] = {} end
-      self.character.actions[spec][slot] = oldID
+      if not self.character.unlearned then self.character.unlearned = {} end
+      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
+      self.character.unlearned[spec][slot] = oldID
     end
   end
 end
@@ -656,6 +673,25 @@ function LA:UI_ERROR_MESSAGE()
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("UI_ERROR_MESSAGE")
     self.untalenting = false
+  end
+end
+function LA:PLAYER_LOGOUT()
+  self:SaveActionBars()
+end
+function LA:DiffActionBars()
+  local spec = GetActiveTalentGroup()
+  for slot = 1, 120 do
+    local actionType = GetActionInfo(slot)
+    -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
+    if self.character.actions and 
+       self.character.actions[spec] and
+       self.character.actions[spec][slot] and
+       not actionType
+    then
+      if not self.character.unlearned then self.character.unlearned = {} end
+      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
+      self.character.unlearned[spec][slot] = self.character.actions[spec][slot]
+    end
   end
 end
 function LA:UpdateCompanions()
@@ -827,16 +863,16 @@ function LA:LearnSpell(kind, id)
   local spec = GetActiveTalentGroup()
   if (not self.retalenting) and
       kind == BOOKTYPE_SPELL and
-      self.character.actions and
-      self.character.actions[spec] then
+      self.character.unlearned and
+      self.character.unlearned[spec] then
     local absoluteID = self:AbsoluteSpellID(id)
-    for slot, oldID in pairs(self.character.actions[spec]) do
+    for slot, oldID in pairs(self.character.unlearned[spec]) do
       local actionType = GetActionInfo(slot)
       --local actionType, actionID, actionSubType, absoluteID = GetActionInfo(slot)
       if oldID == absoluteID and actionType == nil then
         PickupSpell(id, BOOKTYPE_SPELL)
         PlaceAction(slot)
-        self.character.actions[spec][slot] = nil
+        self.character.unlearned[spec][slot] = nil
       end
     end
   end
@@ -1127,11 +1163,11 @@ function LA:FindMissingActions()
     self:AddButton(BOOKTYPE_SPELL, results[result].spellBookID)
   end
 end
-function LA:SaveActions()
+function LA:SaveActionBars()
   local spec = GetActiveTalentGroup()
-  if self.savedActions == nil then self.savedActions = {} end
-  self.savedActions[spec] = {}
-  local savedActions = self.savedActions[spec]
+  if self.character.actions == nil then self.character.actions = {} end
+  self.character.actions[spec] = {}
+  local savedActions = self.character.actions[spec]
   for actionSlot = 1, 120 do
     local actionType, actionID, actionSubType, absoluteID = GetActionInfo(actionSlot)
     if actionType == "spell" then
@@ -1140,25 +1176,28 @@ function LA:SaveActions()
   end
 end
 function LA:RestoreAction(absoluteID)
-  -- OLD AND BUSTED -- savedActions[spec][slot] = absoluteID -- is the new hotness
+  -- self.character.actions[spec][slot] = absoluteID
   local spec = GetActiveTalentGroup()
-  if self.savedActions and self.savedActions[spec] and self.savedActions[spec][absoluteID] then
-    local actionSlot = self.savedActions[spec][absoluteID]
-    self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at action ID "..actionSlot)
-    --local actionType, actionID, actionSubType, slotAbsoluteID = GetActionInfo(actionSlot)
-    local actionType = GetActionInfo(actionSlot)
-    if actionType == nil then
-      local spellBookID
-      for index, info in ipairs(self.spellBookCache) do
-        if info.absoluteID == absoluteID then
-          spellBookID = info.spellBookID
-          self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at Spellbook ID "..spellBookID)
-          break
+  if self.character.actions and self.character.actions[spec] then -- and self.character.actions[spec][absoluteID]
+    for actionSlot, id in pairs(self.character.actions[spec]) do
+      if id == absoluteID then
+        self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at action slot "..actionSlot)
+        --local actionType, actionID, actionSubType, slotAbsoluteID = GetActionInfo(actionSlot)
+        local actionType = GetActionInfo(actionSlot)
+        if actionType == nil then
+          local spellBookID
+          for index, info in ipairs(self.spellBookCache) do
+            if info.absoluteID == absoluteID then
+              spellBookID = info.spellBookID
+              self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at Spellbook ID "..spellBookID)
+              break
+            end
+          end
+          if spellBookID then
+            PickupSpell(spellBookID, BOOKTYPE_SPELL)
+            PlaceAction(actionSlot)
+          end
         end
-      end
-      if spellBookID then
-        PickupSpell(spellBookID, BOOKTYPE_SPELL)
-        PlaceAction(actionSlot)
       end
     end
   end
