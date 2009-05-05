@@ -172,7 +172,7 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
       return;
     end
   elseif spellButton.kind == "MOUNT" or spellButton.kind == "CRITTER" then
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(spelButton.kind, id)
+    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(spellButton.kind, id)
     if ( IsModifiedClick("CHATLINK") ) then
       if ( MacroFrame and MacroFrame:IsShown() ) then
         local spellName = GetSpellInfo(creatureSpellID);
