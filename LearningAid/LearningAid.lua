@@ -186,6 +186,21 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
     end
   end
 end
+
+local learnSpellPattern = string.gsub(ERR_LEARN_SPELL_S, "%%s", ".+")
+local unlearnSpellPattern = string.gsub(ERR_SPELL_UNLEARNED_S, "%%s", ".+")
+local learnAbilityPattern = string.gsub(ERR_LEARN_ABILITY_S, "%%s", ".+")
+local function spellSpamFilter(chatFrame, event, message, ...)
+  if string.match(message, learnSpellPattern) or
+     string.match(message, unlearnSpellPattern) or
+     string.match(message, learnAbilityPattern)
+  then
+    return true -- do not display this message
+  else
+    return false, message, ...
+  end
+end
+
 function LA:OnInitialize()
   if not LearningAid_Saved then LearningAid_Saved = {} end
   if not LearningAid_Character then LearningAid_Character = {} end
@@ -196,6 +211,7 @@ function LA:OnInitialize()
   self.character.version = self.version
   if self.saved.macros == nil then self.saved.macros = true end
   if self.saved.enabled == nil then self.saved.enabled = true end
+  if self.saved.restoreActions == nil then self.saved.restoreActions = true end
   self:DebugPrint("LearningAid:OnInitialize()")
   self.titleHeight = 40
   self.width = 170
@@ -301,12 +317,6 @@ function LA:OnInitialize()
     end
   )
 
-  -- set up the slash command
-  --SlashCmdList["LearningAid"] = function(msg) self:SlashCommand(msg) end
-  --SLASH_LearningAid1 = "/learningaid"
-  --SLASH_LearningAid2 = "/la"
-
-  --self:CreateOptionsPanel()
   self.options = {
     handler = LA,
     type = "group",
@@ -320,6 +330,31 @@ function LA:OnInitialize()
         width = "full",
         order = 1
       },
+      restoreactions = {
+        name = "Restore Actions",
+        desc = "When re-learning talent-based abilities, restore their position on your action bars.",
+        type = "toggle",
+        set = function(info, val) if val then self.saved.restoreActions = val end end,
+        get = function(info) return self.saved.restoreActions end,
+        width = "full",
+        order = 2
+      },
+      filter = {
+        name = "Filter Chat Spam",
+        desc = 'If enabled, filters out "You have learned" and "You have unlearned" spam from the chat log',
+        type = "toggle",
+        set = function(info, val)
+          self.saved.filterSpam = val
+          if val then
+            ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+          else
+            ChatFrameRemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+          end
+        end,
+        get = function(info) return self.saved.filterSpam end,
+        width = "full",
+        order = 3
+      },
       debug = {
         name = "Debug Output",
         desc = "Enables / disables printing debugging information to the chat frame",
@@ -327,7 +362,7 @@ function LA:OnInitialize()
         set = function(info, val) self.saved.debug = val end,
         get = function(info) return self.saved.debug end,
         width = "full",
-        order = 2
+        order = 99
       },
       reset = {
         name = "Reset Position",
@@ -335,7 +370,7 @@ function LA:OnInitialize()
         type = "execute",
         func = "ResetFramePosition",
         width = "full",
-        order = 3
+        order = 4
       },
       missing = {
         name = "Find Missing Abilities",
@@ -343,7 +378,7 @@ function LA:OnInitialize()
         type = "execute",
         func = "FindMissingActions",
         width = "full",
-        order = 4
+        order = 14
       },
       tracking = {
         name = "Find Tracking Abilities",
@@ -352,7 +387,7 @@ function LA:OnInitialize()
         set = function(info, val) self.saved.tracking = val end,
         get = function(info, val) return self.saved.tracking end,
         width = "full",
-        order = 5
+        order = 15
       },
       shapeshift = {
         name = "Find Shapeshift Forms",
@@ -361,7 +396,7 @@ function LA:OnInitialize()
         set = function(info, val) self.saved.shapeshift = val end,
         get = function(info, val) return self.saved.shapeshift end,
         width = "full",
-        order = 6
+        order = 16
       },
       macros = {
         name = "Search Macros",
@@ -370,7 +405,7 @@ function LA:OnInitialize()
         set = function(info, val) self.saved.macros = val end,
         get = function(info, val) return self.saved.macros end,
         width = "full",
-        order = 7
+        order = 17
       },
       unlock = {
         name = "Unlock frame",
@@ -469,17 +504,16 @@ function LA:OnInitialize()
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self.titleText)
   hooksecurefunc("ConfirmTalentWipe", function() 
-    print("LearningAid:ConfirmTalentWipe")
+    self:DebugPrint("LearningAid:ConfirmTalentWipe")
     self:SaveActionBars()
     self.untalenting = true
     self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
-  end) -- PLACEHOLDER
+  end)
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
   self:SetEnabledState(self.saved.enabled)
-  
 end
 function LA:ResetFramePosition()
   local frame = self.frame
@@ -518,10 +552,16 @@ function LA:OnEnable()
   self:UpdateCompanions()
   self:DiffActionBars()
   self:SaveActionBars()
+  if self.saved.filterSpam then
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+  end
 end
 function LA:OnDisable()
   self:Hide()
   self.saved.enabled = false
+  if self.saved.filterSpam then
+    ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+  end
 end
 function LA:PLAYER_REGEN_DISABLED()
   self.inCombat = true
@@ -541,7 +581,7 @@ function LA:SPELLS_CHANGED()
 end
 function LA:COMPANION_LEARNED()
   self:DiffCompanions()
-  self:UpdateCompanions()
+  --self:UpdateCompanions()
 end
 function LA:COMPANION_UPDATE()
   local frame = self.frame
@@ -725,14 +765,14 @@ function LA:DiffCompanionType(kind)
   local i = 1
   local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
   local cache = self.companionCache[kind]
-  local updated = false
+  local updated
   while creatureName do 
     if cache[i] == nil or
        cache[i] ~= creatureName then
       self:DebugPrint("Found new companion, type "..kind..", index "..i)
       self:UpdateCompanionType(kind)
       self:AddCompanion(kind, i)
-      updated = true
+      updated = i
       break
     end
     i = i + 1
@@ -861,7 +901,8 @@ function LA:LearnSpell(kind, id)
     end
   end
   local spec = GetActiveTalentGroup()
-  if (not self.retalenting) and
+  if self.saved.restoreActions and
+      (not self.retalenting) and
       kind == BOOKTYPE_SPELL and
       self.character.unlearned and
       self.character.unlearned[spec] then
@@ -1029,7 +1070,7 @@ function LA:MacroSpells(macroText)
   first, last, line = macroText:find("([^\n]+)[\n]?")
   while first ~= nil do
     self:DebugPrint("Line",line)
-    local lineFirst, lineLast, slash = line:find("^(/%a+)%s+")
+    local lineFirst, lineLast, slash = line:find("^(/%S+)%s+")
     if lineFirst ~= nil then
       self:DebugPrint('Slash "'..slash..'"')
       if self.castSlashCommands[slash] then
@@ -1037,12 +1078,12 @@ function LA:MacroSpells(macroText)
         local token
         local linePos = lineLast
         local found = true
-        -- ignore reset=
-        lineFirst, lineLast = line:find("^reset=%S+%s*", linePos + 1)
-        if lineLast ~= nil then linePos = lineLast end
         while found do
           while found do
             found = false
+            -- ignore reset=
+            lineFirst, lineLast = line:find("^reset=%S+%s*", linePos + 1)
+            if lineLast ~= nil then linePos = lineLast; found = true end
             -- ignore macro options
             lineFirst, lineLast = line:find("^%[[^%]]*]", linePos + 1)
             if lineLast ~= nil then linePos = lineLast; found = true end
@@ -1054,7 +1095,7 @@ function LA:MacroSpells(macroText)
             if lineLast ~= nil then linePos = lineLast; found = true end
           end
           found = false
-          lineFirst, lineLast, token = line:find("^([%a%s':]+)", linePos + 1)
+          lineFirst, lineLast, token = line:find("^([^%(%[,;]+)", linePos + 1)
           if lineLast ~= nil then
             token = strtrim(token)
             linePos = lineLast
