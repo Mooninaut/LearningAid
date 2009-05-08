@@ -1,0 +1,15 @@
+1.07 Under Development
+
+Remember multiple sets of unlearned ability to action bar button mappings.
+
+1.07 Completed Features
+
+Filter "You have learned" and "You have unlearned" spam down to two lines,
+saying "You have unlearned A, B, C." and "You have learned X, Y, Z."
+
+When the player unlearns a spell or ability due to a talent reset, remember where on
+the player's action bars that spell or ability was.  When the spell or ability is
+relearned, put it back on the player's action bar in the same place, as long as that
+slot is empty.
+
+Same as above, but due to a server-side talent reset.

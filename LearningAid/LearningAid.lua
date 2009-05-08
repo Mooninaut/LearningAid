@@ -1,4 +1,4 @@
--- LearningAid v1.07 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.07 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -187,20 +187,28 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
   end
 end
 
-local learnSpellPattern = string.gsub(ERR_LEARN_SPELL_S, "%%s", ".+")
-local unlearnSpellPattern = string.gsub(ERR_SPELL_UNLEARNED_S, "%%s", ".+")
-local learnAbilityPattern = string.gsub(ERR_LEARN_ABILITY_S, "%%s", ".+")
-local function spellSpamFilter(chatFrame, event, message, ...)
-  if string.match(message, learnSpellPattern) or
-     string.match(message, unlearnSpellPattern) or
-     string.match(message, learnAbilityPattern)
-  then
-    return true -- do not display this message
-  else
-    return false, message, ...
-  end
-end
 
+local learnSpellPattern = string.gsub(ERR_LEARN_SPELL_S, "%%s", "(.+)")
+local unlearnSpellPattern = string.gsub(ERR_SPELL_UNLEARNED_S, "%%s", "(.+)")
+local learnAbilityPattern = string.gsub(ERR_LEARN_ABILITY_S, "%%s", "(.+)")
+local function spellSpamFilter(chatFrame, event, message, ...)
+  if LA.untalenting or LA.retalenting then
+    local spell = string.match(message, learnSpellPattern)
+    if not spell then spell = string.match(message, learnAbilityPattern) end
+    if not spell then spell = string.match(message, unlearnSpellPattern) end
+
+    if spell then
+      return true -- do not display the message
+    end
+  end
+  return false, message, ... -- pass the message along
+end
+local defaults = {
+  macros = true,
+  enabled = true,
+  restoreActions = true,
+  filterSpam = 1
+}
 function LA:OnInitialize()
   if not LearningAid_Saved then LearningAid_Saved = {} end
   if not LearningAid_Character then LearningAid_Character = {} end
@@ -209,10 +217,18 @@ function LA:OnInitialize()
   self.version = "1.07"
   self.saved.version = self.version
   self.character.version = self.version
+--[[
   if self.saved.macros == nil then self.saved.macros = true end
   if self.saved.enabled == nil then self.saved.enabled = true end
   if self.saved.restoreActions == nil then self.saved.restoreActions = true end
-  self:DebugPrint("LearningAid:OnInitialize()")
+  if self.saved.filterSpam == nil then self.saved.filterSpam = 1 end
+ --]]
+  for key, value in pairs(defaults) do
+    if self.saved[key] == nil then
+      self.saved[key] = value
+    end
+  end
+  self:DebugPrint("OnInitialize()")
   self.titleHeight = 40
   self.width = 170
   self.buttonSpacing = 5
@@ -230,6 +246,8 @@ function LA:OnInitialize()
   self.activatePrimarySpec = GetSpellInfo(63645)
   self.activateSecondarySpec = GetSpellInfo(63644)
   self.queue = {}
+  self.spellsLearned = {}
+  self.spellsUnlearned = {}
 
   -- create main frame
   local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
@@ -323,7 +341,7 @@ function LA:OnInitialize()
     args = {
       lock = {
         name = "Lock Frame",
-        desc = "Locks the Learning Aid frame so it cannot by moved by accident",
+        desc = "Locks the Learning Aid frame so it cannot by moved by accident.",
         type = "toggle",
         set = function(info, val) if val then self:Lock() else self:Unlock() end end,
         get = function(info) return self.saved.locked end,
@@ -340,24 +358,29 @@ function LA:OnInitialize()
         order = 2
       },
       filter = {
-        name = "Filter Chat Spam",
-        desc = 'If enabled, filters out "You have learned" and "You have unlearned" spam from the chat log',
-        type = "toggle",
+        name = "Show Learn/Unlearn Messages",
+        desc = 'Show All: Blizzard default.  Summarize: Reduce the messages to a one or two line compact form.  Show None: Do not display any learn/unlearn messages in the chat log.',
+        type = "select",
+        values = {
+          [0] = "Show All",
+          [1] = "Summarize",
+          [2] = "Show None"
+        },
         set = function(info, val)
           self.saved.filterSpam = val
-          if val then
+          if val ~= 0 then
             ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
           else
-            ChatFrameRemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+            ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
           end
         end,
         get = function(info) return self.saved.filterSpam end,
-        width = "full",
+        --width = "full",
         order = 3
       },
       debug = {
         name = "Debug Output",
-        desc = "Enables / disables printing debugging information to the chat frame",
+        desc = "Enables / disables printing debugging information to the chat frame.",
         type = "toggle",
         set = function(info, val) self.saved.debug = val end,
         get = function(info) return self.saved.debug end,
@@ -366,57 +389,65 @@ function LA:OnInitialize()
       },
       reset = {
         name = "Reset Position",
-        desc = "Reset the position of the Learning Aid frame to the default",
+        desc = "Reset the position of the Learning Aid frame to the default.",
         type = "execute",
         func = "ResetFramePosition",
         width = "full",
         order = 4
       },
       missing = {
+        type = "group",
+        inline = true,
         name = "Find Missing Abilities",
-        desc = "Search the spellbook and action bars to find spells or abilities which are not on any action bar",
-        type = "execute",
-        func = "FindMissingActions",
-        width = "full",
-        order = 14
-      },
-      tracking = {
-        name = "Find Tracking Abilities",
-        desc = "If enabled, Find Missing Abilities will search for Tracking Abilities as well",
-        type = "toggle",
-        set = function(info, val) self.saved.tracking = val end,
-        get = function(info, val) return self.saved.tracking end,
-        width = "full",
-        order = 15
-      },
-      shapeshift = {
-        name = "Find Shapeshift Forms",
-        desc = "If enabled, Find Missing Abilities will search for forms, auras, stances, presences, etc.",
-        type = "toggle",
-        set = function(info, val) self.saved.shapeshift = val end,
-        get = function(info, val) return self.saved.shapeshift end,
-        width = "full",
-        order = 16
-      },
-      macros = {
-        name = "Search Macros",
-        desc = "If enabled, Find Missing Abilities will search macros for spells",
-        type = "toggle",
-        set = function(info, val) self.saved.macros = val end,
-        get = function(info, val) return self.saved.macros end,
-        width = "full",
-        order = 17
+        order = 10,
+        args = {
+          search = {
+            name = "Search",
+            desc = "Search the spellbook and action bars to find spells or abilities which are not on any action bar.",
+            type = "execute",
+            func = "FindMissingActions",
+--            width = "full",
+            order = 1
+          },
+          tracking = {
+            name = "Find Tracking Abilities",
+            desc = "If enabled, Find Missing Abilities will search for tracking abilities as well.",
+            type = "toggle",
+            set = function(info, val) self.saved.tracking = val end,
+            get = function(info, val) return self.saved.tracking end,
+            width = "full",
+            order = 2
+          },
+          shapeshift = {
+            name = "Find Shapeshift Forms",
+            desc = "If enabled, Find Missing Abilities will search for forms, auras, stances, presences, etc.",
+            type = "toggle",
+            set = function(info, val) self.saved.shapeshift = val end,
+            get = function(info, val) return self.saved.shapeshift end,
+            width = "full",
+            order = 3
+          },
+          macros = {
+            name = "Search Macros",
+            desc = "If enabled, Find Missing Abilities will search inside macros for spells.",
+            type = "toggle",
+            set = function(info, val) self.saved.macros = val end,
+            get = function(info, val) return self.saved.macros end,
+            width = "full",
+            order = 4
+          }
+        }
       },
       unlock = {
         name = "Unlock frame",
-        desc = "Unlocks the Learning Aid frame so it can be moved",
+        desc = "Unlocks the Learning Aid frame so it can be moved.",
         type = "execute",
         guiHidden = true,
         func = "Unlock"
       },
       config = {
         name = "Configure",
-        desc = "Open the Learning Aid configuration panel",
+        desc = "Open the Learning Aid configuration panel.",
         type = "execute",
         func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
         guiHidden = true
@@ -424,13 +455,13 @@ function LA:OnInitialize()
       test = {
         type = "group",
         name = "Test",
-        desc = "Perform various tests with Learning Aid",
+        desc = "Perform various tests with Learning Aid.",
         guiHidden = true,
         args = {
           add = {
             type = "group",
             name = "Add",
-            desc = "Add a button to the Learning Aid frame",
+            desc = "Add a button to the Learning Aid frame.",
             args = {
               spell = {
                 type = "input",
@@ -461,7 +492,7 @@ function LA:OnInitialize()
           remove = {
             type = "group",
             name = "Remove",
-            desc = "Remove a button from the Learning Aid frame",
+            desc = "Remove a button from the Learning Aid frame.",
             args = {
               spell = {
                 type = "input",
@@ -504,9 +535,10 @@ function LA:OnInitialize()
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self.titleText)
   hooksecurefunc("ConfirmTalentWipe", function() 
-    self:DebugPrint("LearningAid:ConfirmTalentWipe")
+    self:DebugPrint("ConfirmTalentWipe")
     self:SaveActionBars()
     self.untalenting = true
+    self.spellsUnlearned = {}
     self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
@@ -527,13 +559,13 @@ function LA:AceSlashCommand(msg)
 end
 function LA:OnEvent(event, ...)
   self:DebugPrint(event, ...)
-  if LearningAid[event] then
-    LearningAid[event](self, ...)
+  if self[event] then
+    self[event](self, ...)
   end
 end
 function LA:OnEnable()
   self.saved.enabled = true
-  self:DebugPrint("LearningAid:OnEnable()")
+  self:DebugPrint("OnEnable()")
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
   self:RegisterEvent("COMPANION_LEARNED", "OnEvent")
   --self:RegisterEvent("COMPANION_UPDATE")
@@ -548,6 +580,7 @@ function LA:OnEnable()
   self:RegisterEvent("UNIT_SPELLCAST_START", "OnEvent")
   self:RegisterEvent("PLAYER_LEAVING_WORLD", "OnEvent")
   self:RegisterEvent("PLAYER_LOGOUT", "OnEvent")
+  self:RegisterEvent("CHAT_MSG_SYSTEM", "OnEvent")
   self:UpdateSpellBook()
   self:UpdateCompanions()
   self:DiffActionBars()
@@ -639,30 +672,60 @@ function LA:CURRENT_SPELL_CAST_CHANGED()
 end
 function LA:UNIT_SPELLCAST_START(unit, spell)
   if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
-    self:DebugPrint("Learning Aid: Talent swap initiated")
+    self:DebugPrint("Talent swap initiated")
     self.retalenting = true
+    self.spellsLearned = {}
+    self.spellsUnlearned = {}
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
   end
 end
 function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
   if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
-    self:DebugPrint("Learning Aid: Talent swap canceled")
+    self:DebugPrint("Talent swap canceled")
     self.retalenting = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
   end
 end
+local function formatSpells(ranks)
+  local spells = {}
+  for spell, rank in pairs(ranks) do table.insert(spells, spell) end
+  table.sort(spells)
+  local strings = {}
+  for index, spell in ipairs(spells) do
+    if ranks[spell] == "" then 
+      table.insert(strings, spell)
+    else
+      table.insert(strings, spell .." (Rank " .. ranks[spell] .. ")")
+    end
+  end
+  return table.concat(strings, ", ")
+end
+local systemInfo = ChatTypeInfo["SYSTEM"]
+local function systemPrint(message)
+  DEFAULT_CHAT_FRAME:AddMessage(message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
+end
 function LA:PLAYER_TALENT_UPDATE()
   if self.retalenting then
-    self:DebugPrint("Learning Aid: Talent swap completed")
+    self:DebugPrint("Talent swap completed")
     self.retalenting = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    if self.saved.filterSpam == 1 then 
+      local learned = formatSpells(self.spellsLearned)
+      local unlearned = formatSpells(self.spellsUnlearned)
+      if string.len(unlearned) > 0 then systemPrint("Learning Aid: You have unlearned ".. unlearned..".") end
+      if string.len(learned) > 0 then systemPrint("Learning Aid: You have learned "..learned..".") end
+    end
   elseif self.untalenting then
     self.untalenting = false
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
+    if self.saved.filterSpam == 1 then
+      local unlearned = formatSpells(self.spellsUnlearned)
+      if string.len(unlearned) > 0 then systemPrint("Learning Aid: You have unlearned "..unlearned..".") end
+    end
   end
 end
 function LA:PLAYER_LEAVING_WORLD()
@@ -717,6 +780,33 @@ function LA:UI_ERROR_MESSAGE()
 end
 function LA:PLAYER_LOGOUT()
   self:SaveActionBars()
+end
+local function unRankSpell(spell)
+  local rank = string.match(spell, "%s*%([^%)]*%)%s*")
+  local rankNumber
+  if rank then
+    match = string.gsub(rank, "[%(%)]", "%%%1") -- turn rank into a match expression
+    spell = string.gsub(spell, match, "")
+    rankNumber = string.match(rank, "%d+")
+  end
+  return spell, rankNumber
+end
+function LA:CHAT_MSG_SYSTEM(message)
+  local spell = string.match(message, learnSpellPattern)
+  if not spell then spell = string.match(message, learnAbilityPattern) end
+  if spell then
+    local rank
+    spell, rank = unRankSpell(spell)
+    LA.spellsLearned[spell] = rank or ""
+  else
+    spell = string.match(message, unlearnSpellPattern)
+    if spell then
+      local rank
+      --LearningAid:DebugPrint("Unlearned", spell)
+      spell, rank = unRankSpell(spell)
+      LA.spellsUnlearned[spell] = rank or ""
+    end
+  end
 end
 function LA:DiffActionBars()
   local spec = GetActiveTalentGroup()
@@ -821,7 +911,7 @@ function LA:RemoveSpell(id)
 end
 function LA:ProcessQueue()
   if self.inCombat then
-    self:DebugPrint("Cannot process action queue during combat in LearningAid:ProcessQueue")
+    self:DebugPrint("ProcessQueue(): Cannot process action queue during combat.")
     return
   end
   local queue = self.queue
@@ -837,18 +927,18 @@ function LA:ProcessQueue()
       elseif item.action == "FORGET" then
         self:RemoveSpell(item.id)
       else
-        self:DebugPrint("Invalid action type " .. item.action .. " in LearningAid:ProcessQueue")
+        self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
       end
     elseif item.kind == "CRITTER" or item.kind == "MOUNT" then
       if item.action == "LEARN" then
         self:AddCompanion(item.kind, item.id)
       else
-        self:DebugPrint("Invalid action type " .. item.action .. "in LearningAid:ProcessQueue")
+        self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
       end
     elseif item.kind == "HIDE" then
       self:Hide()
     else
-      self:DebugPrint("Invalid entry type " .. item.kind .. " in LearningAid:ProcessQueue")
+      self:DebugPrint("ProcessQueue(): Invalid entry type " .. item.kind)
     end
   end
   self.queue = {}
@@ -974,12 +1064,12 @@ end
 function LA:AddButton(kind, id)
   if kind == BOOKTYPE_SPELL then
     if id > #self.spellBookCache or id < 1 then
-      self:DebugPrint("LearningAid:AddButton() - Invalid spell ID", id)
+      self:DebugPrint("AddButton(): Invalid spell ID", id)
       return
     end
   elseif kind == "MOUNT" or kind == "CRITTER" then
     if id > #self.companionCache[kind] or id < 1 then
-      self:DebugPrint("LearningAid:AddButton() - Invalid companion type", kind, "ID", id)
+      self:DebugPrint("AddButton(): Invalid companion type", kind, "ID", id)
       return
     end
   end
@@ -1029,7 +1119,7 @@ function LA:AddButton(kind, id)
       button:SetChecked(true)
     end
   else
-    print("Invalid button type "..kind.." in LearningAid.AddButton()")
+    print("AddButton(): Invalid button type "..kind)
   end
   self:UpdateButton(button)
   frame:Show()
@@ -1222,7 +1312,7 @@ function LA:RestoreAction(absoluteID)
   if self.character.actions and self.character.actions[spec] then -- and self.character.actions[spec][absoluteID]
     for actionSlot, id in pairs(self.character.actions[spec]) do
       if id == absoluteID then
-        self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at action slot "..actionSlot)
+        self:DebugPrint("RestoreAction("..absoluteID.."): Found action at action slot "..actionSlot)
         --local actionType, actionID, actionSubType, slotAbsoluteID = GetActionInfo(actionSlot)
         local actionType = GetActionInfo(actionSlot)
         if actionType == nil then
@@ -1230,7 +1320,7 @@ function LA:RestoreAction(absoluteID)
           for index, info in ipairs(self.spellBookCache) do
             if info.absoluteID == absoluteID then
               spellBookID = info.spellBookID
-              self:DebugPrint("LearningAid:RestoreAction("..absoluteID..") found action at Spellbook ID "..spellBookID)
+              self:DebugPrint("RestoreAction("..absoluteID.."): Found action at Spellbook ID "..spellBookID)
               break
             end
           end
@@ -1350,7 +1440,7 @@ function LA:TestRemove(kind, ...)
 end
 function LA:DebugPrint(...)
   if self.saved.debug and self.saved.enabled then
-    print(...)
+    print("Learning Aid:", ...)
   end
 end
 function LA:OnShow()
