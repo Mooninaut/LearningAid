@@ -1,9 +1,16 @@
-Learning Aid version 1.07
+Learning Aid version 1.07 RC 1
 Written by Jamash (Kil'jaeden US)
 
+http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx 
 http://www.wowinterface.com/downloads/info10622-LearningAid.html
 
-Learning Aid helps you put new spells, abilities, tradeskills, mounts and minipets on your action bars or in your macros when you learn them, without having to page through your Spellbook or Pets tab.  When you learn something new, Learning Aid pops up a window with an icon for the newly learned action.  You may then drag the icon to your action bar, or use it to paste a link into chat or text into a macro.  You can also use the new action directly by clicking on the icon.  When you're done, you can easily dismiss the window.
+Learning Aid helps you put new spells, abilities, tradeskills, mounts and
+minipets on your action bars or in your macros when you learn them, without
+having to page through your Spellbook or Pets tab.  When you learn something
+new, Learning Aid pops up a window with an icon for the newly learned action.
+You may then drag the icon to your action bar, or use it to paste a link into
+chat or text into a macro.  You can also use the new action directly by
+clicking on the icon.  When you're done, you can easily dismiss the window.
 
 
 User Interface Reference
@@ -37,7 +44,17 @@ Slash Commands
 /la config
   Open the Learning Aid configuration window
 
-/la missing
+/restoreactions [on|off]
+  Toggle whether to restore talent-based actions to action bars when they are relearned.
+
+/filter [0|1|2]
+  Set whether to filter "You have learned" and "You have unlearned" chat messages.
+    0 - Show All: Do not filter learning and unlearning messages.
+    1 - Summarize: Reduce multiple lines of messages to a one or two line summary.
+    2 - Show None: Filter out all learning and unlearning messages.
+    Default: 1
+
+/la search
   Scan through your action bars to find any spells you have learned
   but not placed on an action bar
 
