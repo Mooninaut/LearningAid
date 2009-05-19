@@ -1,4 +1,4 @@
--- Learning Aid v1.07 RC 1 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.07 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -14,6 +14,11 @@ LA.strings.enUS = {
   yourPetHasUnlearned = "Your pet has unlearned %s.",
   lockFrame = "Lock Frame",
 }
+
+local FILTER_SHOW_ALL  = 0
+local FILTER_SUMMARIZE = 1
+local FILTER_SHOW_NONE = 2
+
 --LearningAid_Saved = {}
 --[[
 local eventFrame = CreateFrame("Frame", nil, UIParent)
@@ -215,7 +220,12 @@ end
 local function spellSpamFilter(chatFrame, event, message, ...)
   LA:DebugPrint("spellSpamFilter: ", event, message, ...)
   local spell
-  if LA.untalenting or LA.retalenting or (LA.pendingTalentCount > 0) or LA.saved.filterSpam == 2 then
+  if LA.untalenting or
+     LA.retalenting or
+     (LA.pendingTalentCount > 0) or
+     (LA.saved.filterSpam == FILTER_SHOW_NONE) or
+     LA.learning
+  then
     spell = string.match(message, patterns.learnSpell)
     if not spell then spell = string.match(message, patterns.learnAbility) end
     if not spell then spell = string.match(message, patterns.unlearnSpell) end
@@ -235,7 +245,7 @@ local defaults = {
   macros = true,
   enabled = true,
   restoreActions = true,
-  filterSpam = 1
+  filterSpam = FILTER_SUMMARIZE
 }
 function LA:GetText(id, ...)
   local result = ""
@@ -253,15 +263,9 @@ function LA:OnInitialize()
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.07 RC 1"
+  self.version = "1.07"
   self.saved.version = self.version
   self.character.version = self.version
---[[
-  if self.saved.macros == nil then self.saved.macros = true end
-  if self.saved.enabled == nil then self.saved.enabled = true end
-  if self.saved.restoreActions == nil then self.saved.restoreActions = true end
-  if self.saved.filterSpam == nil then self.saved.filterSpam = 1 end
- --]]
   for key, value in pairs(defaults) do
     if self.saved[key] == nil then
       self.saved[key] = value
@@ -272,10 +276,6 @@ function LA:OnInitialize()
   self.width = 170
   self.buttonSpacing = 5
   self.buttonSize = 37
-  --self.titleText = "Learning Aid"
-  --self.lockText = "Lock Position"
-  --self.unlockText = "Unlock Position"
-  --self.closeText = "Close"
   local version, build, date, tocversion = GetBuildInfo()
   self.locale = GetLocale()
   self.tocVersion = tocversion
@@ -406,13 +406,13 @@ function LA:OnInitialize()
         desc = 'Show All: Blizzard default.  Summarize: Reduce the messages to a one or two line compact form.  Show None: Do not display any learn/unlearn messages in the chat log.',
         type = "select",
         values = {
-          [0] = "Show All",
-          [1] = "Summarize",
-          [2] = "Show None"
+          [FILTER_SHOW_ALL ] = "Show All",
+          [FILTER_SUMMARIZE] = "Summarize",
+          [FILTER_SHOW_NONE] = "Show None"
         },
         set = function(info, val)
           self.saved.filterSpam = val
-          if val ~= 0 then
+          if val ~= FILTER_SHOW_ALL then
             ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
           else
             ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
@@ -664,14 +664,14 @@ function LA:OnEnable()
   self:UpdateCompanions()
   self:DiffActionBars()
   self:SaveActionBars()
-  if self.saved.filterSpam then
+  if self.saved.filterSpam ~= FILTER_SHOW_ALL then
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
 function LA:OnDisable()
   self:Hide()
   self.saved.enabled = false
-  if self.saved.filterSpam then
+  if self.saved.filterSpam ~= FILTER_SHOW_ALL then
     ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
@@ -791,7 +791,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self.retalenting = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    if self.saved.filterSpam == 1 then 
+    if self.saved.filterSpam == FILTER_SUMMARIZE then 
       local learned = formatSpells(self.spellsLearned)
       local unlearned = formatSpells(self.spellsUnlearned)
       if string.len(unlearned) > 0 then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
@@ -804,7 +804,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UI_ERROR_MESSAGE")
-    if self.saved.filterSpam == 1 then
+    if self.saved.filterSpam == FILTER_SUMMARIZE then
       local unlearned = formatSpells(self.spellsUnlearned)
       if string.len(unlearned) > 0 then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
     end
@@ -813,7 +813,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self.pendingTalentCount = self.pendingTalentCount - 1
     if self.pendingTalentCount <= 0 then
       --self.learning = false
-      if self.saved.filterSpam == 1 then
+      if self.saved.filterSpam == FILTER_SUMMARIZE then
         local learned = formatSpells(self.spellsLearned)
         if string.len(learned) > 0 then systemPrint(self:GetText("youHaveLearned", learned)) end
       end
@@ -821,6 +821,14 @@ function LA:PLAYER_TALENT_UPDATE()
       wipe(self.pendingTalents)
       wipe(self.spellsLearned)
     end
+  elseif self.learning then
+    self.learning = false
+    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
+    if self.saved.filterSpam == FILTER_SUMMARIZE then
+      local learned = formatSpells(self.spellsLearned)
+      if string.len(learned) > 0 then systemPrint(self:GetText("youHaveLearned", learned)) end
+    end
+    wipe(self.spellsLearned)
   end
 end
 function LA:PLAYER_LEAVING_WORLD()
@@ -919,24 +927,24 @@ function LA:CHAT_MSG_SYSTEM(message)
   end
 end
 function LA:PET_TALENT_UPDATE()
-  if self.saved.filterSpam == 1 then
+  if self.saved.filterSpam == FILTER_SUMMARIZE then
     local petLearned = formatSpells(self.petLearned)
     local petUnlearned = formatSpells(self.petUnlearned)
     if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
     if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-    wipe(self.petLearned)
-    wipe(self.petUnlearned)
   end
+  wipe(self.petLearned)
+  wipe(self.petUnlearned)
 end
 function LA:PLAYER_LEVEL_UP()
-  if self.saved.filterSpam == 1 then
+  if self.saved.filterSpam == FILTER_SUMMARIZE then
     local petLearned = formatSpells(self.petLearned)
     local petUnlearned = formatSpells(self.petUnlearned)
     if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
     if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-    wipe(self.petLearned)
-    wipe(self.petUnlearned)
   end
+  wipe(self.petLearned)
+  wipe(self.petUnlearned)
 end
 function LA:DiffActionBars()
   local spec = GetActiveTalentGroup()

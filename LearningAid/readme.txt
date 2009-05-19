@@ -1,4 +1,4 @@
-Learning Aid version 1.07 RC 1
+Learning Aid version 1.07
 Written by Jamash (Kil'jaeden US)
 
 http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx 
@@ -44,10 +44,10 @@ Slash Commands
 /la config
   Open the Learning Aid configuration window
 
-/restoreactions [on|off]
+/la restoreactions [on|off]
   Toggle whether to restore talent-based actions to action bars when they are relearned.
 
-/filter [0|1|2]
+/la filter [0|1|2]
   Set whether to filter "You have learned" and "You have unlearned" chat messages.
     0 - Show All: Do not filter learning and unlearning messages.
     1 - Summarize: Reduce multiple lines of messages to a one or two line summary.
