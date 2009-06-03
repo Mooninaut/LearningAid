@@ -1,4 +1,4 @@
--- Learning Aid v1.07 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.07.1 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -19,19 +19,6 @@ local FILTER_SHOW_ALL  = 0
 local FILTER_SUMMARIZE = 1
 local FILTER_SHOW_NONE = 2
 
---LearningAid_Saved = {}
---[[
-local eventFrame = CreateFrame("Frame", nil, UIParent)
-eventFrame:RegisterAllEvents()
-eventFrame:SetScript("OnEvent", function (self, event, ...)
-  local actionType, actionID, actionSubType, globalID = GetActionInfo(1)
-  if actionType then
-    print("Action Bar info available at event", event, ...)
-    print(actionType, actionID, actionSubType, globalID)
-    eventFrame:UnregisterAllEvents()
-  end
-end)
---]]
 -- Adapted from SpellBookFrame.lua
 function LA:UpdateButton(button)
   local id = button:GetID();
@@ -263,7 +250,7 @@ function LA:OnInitialize()
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.07"
+  self.version = "1.07.1"
   self.saved.version = self.version
   self.character.version = self.version
   for key, value in pairs(defaults) do
@@ -660,8 +647,8 @@ function LA:OnEnable()
   self:RegisterEvent("CHAT_MSG_SYSTEM", "OnEvent")
   self:RegisterEvent("PET_TALENT_UPDATE", "OnEvent")
   self:RegisterEvent("PLAYER_LEVEL_UP", "OnEvent")
-  self:UpdateSpellBook()
   self:UpdateCompanions()
+  self:UpdateSpellBook()
   self:DiffActionBars()
   self:SaveActionBars()
   if self.saved.filterSpam ~= FILTER_SHOW_ALL then
@@ -968,15 +955,22 @@ function LA:UpdateCompanions()
   self:UpdateCompanionType("CRITTER")
 end
 function LA:UpdateCompanionType(kind)
-  self.companionCache[kind] = {}
-  local cache = self.companionCache[kind]
-  local i = 1
-  local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
-  while creatureName do
-    cache[i] = creatureName
-    i = i + 1
-    creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
+  if self.companionCache[kind] then
+    wipe(self.companionCache[kind])
+  else
+    self.companionCache[kind] = {}
   end
+  local cache = self.companionCache[kind]
+  local count = GetNumCompanions(kind)
+  for i = 1, count do
+    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
+    if creatureName then 
+      cache[creatureName] = true
+    else
+      self:DebugPrint("Bad companion, kind = "..kind..", index = "..i)
+    end
+  end
+  self:DebugPrint("Updated companion type "..kind..", "..count.." companions found.")
 end
 function LA:DiffCompanions()
   self:DiffCompanionType("MOUNT")
@@ -991,21 +985,18 @@ function LA:AddCompanion(kind, id)
   end
 end
 function LA:DiffCompanionType(kind)
-  local i = 1
-  local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
+  local count = GetNumCompanions(kind)
   local cache = self.companionCache[kind]
   local updated
-  while creatureName do 
-    if cache[i] == nil or
-       cache[i] ~= creatureName then
+  for i = 1, count do
+    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
+    if cache[creatureName] == nil then
       self:DebugPrint("Found new companion, type "..kind..", index "..i)
-      self:UpdateCompanionType(kind)
+      cache[creatureName] = true
       self:AddCompanion(kind, i)
       updated = i
       break
     end
-    i = i + 1
-    creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
   end
   return updated
 end
@@ -1209,8 +1200,8 @@ function LA:AddButton(kind, id)
       return
     end
   elseif kind == "MOUNT" or kind == "CRITTER" then
-    if id > #self.companionCache[kind] or id < 1 then
-      self:DebugPrint("AddButton(): Invalid companion type", kind, "ID", id)
+    if id < 1 or id > GetNumCompanions(kind) then
+      self:DebugPrint("AddButton(): Invalid companion, type", kind, "ID", id)
       return
     end
   end
