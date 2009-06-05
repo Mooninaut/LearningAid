@@ -96,12 +96,12 @@ Slash Commands
 
 Advanced Slash Commands
 
+/la debug
+  Turn debugging output on or off.
+
 /la test
   /la test add TYPE INDEX [INDEX ...]
   /la test remove TYPE INDEX
     TYPE is "spell", "mount" or "critter".
     INDEX is the number of the spell, mount or minipet you wish to add or
     remove, counting from 1.
-
-/la debug
-  Turn debugging output on or off.

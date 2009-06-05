@@ -3,214 +3,30 @@
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
 LA.strings = {}
-LA.strings.enUS = {
-  title = "Learning Aid",
-  lockPosition = "Lock Position",
-  unlockPosition = "Unlock Position",
-  close = "Close",
-  youHaveLearned = "You have learned %s.",
-  youHaveUnlearned = "You have unlearned %s.",
-  yourPetHasLearned = "Your pet has learned %s.",
-  yourPetHasUnlearned = "Your pet has unlearned %s.",
-  lockFrame = "Lock Frame",
-}
 
-local FILTER_SHOW_ALL  = 0
-local FILTER_SUMMARIZE = 1
-local FILTER_SHOW_NONE = 2
-
--- Adapted from SpellBookFrame.lua
-function LA:UpdateButton(button)
-  local id = button:GetID();
-
-  local name = button:GetName();
-  local iconTexture = getglobal(name.."IconTexture");
-  local spellString = getglobal(name.."SpellName");
-  local subSpellString = getglobal(name.."SubSpellName");
-  local cooldown = getglobal(name.."Cooldown");
-  local autoCastableTexture = getglobal(name.."AutoCastable");
-  local highlightTexture = getglobal(name.."Highlight");
-  local normalTexture = getglobal(name.."NormalTexture");
-  if not self.inCombat then
-    button:Enable();
-  end
-
-  if button.kind == BOOKTYPE_SPELL then
-
-    local texture = GetSpellTexture(id, BOOKTYPE_SPELL);
-
-    -- If no spell, hide everything and return
-    if ( not texture or (strlen(texture) == 0) ) then
-      iconTexture:Hide();
-      spellString:Hide();
-      subSpellString:Hide();
-      cooldown:Hide();
-      autoCastableTexture:Hide();
-      SpellBook_ReleaseAutoCastShine(button.shine)
-      button.shine = nil;
-      highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square");
-      button:SetChecked(0);
-      normalTexture:SetVertexColor(1.0, 1.0, 1.0);
-      return;
-    end
-
-    local start, duration, enable = GetSpellCooldown(id, BOOKTYPE_SPELL);
-    CooldownFrame_SetTimer(cooldown, start, duration, enable);
-    cooldown.start = start
-    cooldown.duration = duration
-    cooldown.enable = enable
-    if ( enable == 1 ) then
-      iconTexture:SetVertexColor(1.0, 1.0, 1.0);
-    else
-      iconTexture:SetVertexColor(0.4, 0.4, 0.4);
-    end
-
-    local spellName, subSpellName = GetSpellName(id, BOOKTYPE_SPELL);
-
-    normalTexture:SetVertexColor(1.0, 1.0, 1.0);
-    highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square");
-    spellString:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b);
-
-  -- Set Secure Action Button attribute
-    if not self.inCombat then
-      button:SetAttribute("spell*", spellName)
-    end
-
-    iconTexture:SetTexture(texture);
-    spellString:SetText(spellName);
-    subSpellString:SetText(subSpellName);
-    if ( subSpellName ~= "" ) then
-      spellString:SetPoint("LEFT", button, "RIGHT", 4, 4);
-    else
-      spellString:SetPoint("LEFT", button, "RIGHT", 4, 2);
-    end
-  elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
-
-    -- Some companions have two names, the display name and the spell name
-    -- Make sure to use the spell name for casting
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(button.kind, id)
-    local spellName = GetSpellInfo(creatureSpellID);
-    iconTexture:SetTexture(icon)
-    spellString:SetText(creatureName)
-    subSpellString:SetText("")
-    if not self.inCombat then
-      button:SetAttribute("spell*", spellName)
-    end
-  end
-  iconTexture:Show();
-  spellString:Show();
-  subSpellString:Show();
-  --SpellButton_UpdateSelection(self);
-end
--- Adapted from SpellBookFrame.lua
-function LA:SpellButton_OnDrag(button)
-  local id = button:GetID();
-  if button.kind == BOOKTYPE_SPELL then
-    PickupSpell(id, button.kind);
-  elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
-    PickupCompanion(button.kind, id)
-  end
-end
--- Adapted from SpellBookFrame.lua
-function LA:SpellButton_OnEnter(button)
-  local id = button:GetID();
-  local kind = button.kind
-  GameTooltip:SetOwner(button, "ANCHOR_RIGHT");
-  if kind == BOOKTYPE_SPELL then
-    if GameTooltip:SetSpell(id, BOOKTYPE_SPELL) then
-      button.UpdateTooltip = function (...) self:SpellButton_OnEnter(...) end
-    else
-      button.UpdateTooltip = nil
-    end
-  elseif kind == "MOUNT" or kind == "CRITTER" then
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, id)
-    if GameTooltip:SetHyperlink("spell:"..creatureSpellID) then
-      button.UpdateTooltip = function (...) self:SpellButton_OnEnter(...) end
-    else
-      button.UpdateTooltip = nil;
-    end
-  else
-    print("Invalid button type in LearningAid:SpellButton_OnEnter: "..button.kind)
-  end
-end
--- Adapted from SpellBookFrame.lua
-function LA:SpellButton_UpdateSelection(button)
-  if button.kind == BOOKTYPE_SPELL then
-    local id = button:GetID()
-    if IsSelectedSpell(id, BOOKTYPE_SPELL) then
-      button:SetChecked("true");
-    else
-      button:SetChecked("false");
-    end
-  end
-end
--- Adapted from SpellBookFrame.lua
-function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
-  local id = spellButton:GetID()
-  local spellName, subSpellName
-  if spellButton.kind == BOOKTYPE_SPELL then
-    if ( id > MAX_SPELLS ) then
-      return;
-    end
-    if ( IsModifiedClick("CHATLINK") ) then
-      if ( MacroFrame and MacroFrame:IsShown() ) then
-        spellName, subSpellName = GetSpellName(id, BOOKTYPE_SPELL);
-          if ( spellName and not IsPassiveSpell(id, BOOKTYPE_SPELL) ) then
-            if ( subSpellName and (strlen(subSpellName) > 0) ) then
-              ChatEdit_InsertLink(spellName.."("..subSpellName..")");
-            else
-              ChatEdit_InsertLink(spellName);
-            end
-          end
-        return;
-      else
-        local spellLink = GetSpellLink(id, BOOKTYPE_SPELL);
-          if(spellLink) then
-            ChatEdit_InsertLink(spellLink);
-          end
-        return;
-      end
-    end
-    if ( IsModifiedClick("PICKUPACTION") ) then
-      PickupSpell(id, BOOKTYPE_SPELL);
-      return;
-    end
-  elseif spellButton.kind == "MOUNT" or spellButton.kind == "CRITTER" then
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(spellButton.kind, id)
-    if ( IsModifiedClick("CHATLINK") ) then
-      if ( MacroFrame and MacroFrame:IsShown() ) then
-        local spellName = GetSpellInfo(creatureSpellID);
-        ChatEdit_InsertLink(spellName);
-      else
-        local spellLink = GetSpellLink(creatureSpellID)
-        ChatEdit_InsertLink(spellLink);
-      end
-    elseif ( IsModifiedClick("PICKUPACTION") ) then
-      self.SpellButton_OnDrag(spellButton);
-    end
-  end
-end
-
+LA.FILTER_SHOW_ALL  = 0
+LA.FILTER_SUMMARIZE = 1
+LA.FILTER_SHOW_NONE = 2
 
 local patterns = {
-  learnAbility = ERR_LEARN_ABILITY_S,
-  learnSpell   = ERR_LEARN_SPELL_S,
-  unlearnSpell = ERR_SPELL_UNLEARNED_S,
+  learnAbility    = ERR_LEARN_ABILITY_S,
+  learnSpell      = ERR_LEARN_SPELL_S,
+  unlearnSpell    = ERR_SPELL_UNLEARNED_S,
   petLearnAbility = ERR_PET_LEARN_ABILITY_S,
-  petLearnSpell = ERR_PET_LEARN_SPELL_S,
+  petLearnSpell   = ERR_PET_LEARN_SPELL_S,
   petUnlearnSpell = ERR_PET_SPELL_UNLEARNED_S
 }
 for name, pattern in pairs(patterns) do
   patterns[name] = string.gsub(pattern, "%%s", "(.+)")
 end
- 
+
 local function spellSpamFilter(chatFrame, event, message, ...)
   LA:DebugPrint("spellSpamFilter: ", event, message, ...)
   local spell
   if LA.untalenting or
      LA.retalenting or
      (LA.pendingTalentCount > 0) or
-     (LA.saved.filterSpam == FILTER_SHOW_NONE) or
+     (LA.saved.filterSpam == LA.FILTER_SHOW_NONE) or
      LA.learning
   then
     spell = string.match(message, patterns.learnSpell)
@@ -232,7 +48,7 @@ local defaults = {
   macros = true,
   enabled = true,
   restoreActions = true,
-  filterSpam = FILTER_SUMMARIZE
+  filterSpam = LA.FILTER_SUMMARIZE
 }
 function LA:GetText(id, ...)
   local result = ""
@@ -371,8 +187,8 @@ function LA:OnInitialize()
     type = "group",
     args = {
       lock = {
-        name = "Lock Frame",
-        desc = "Locks the Learning Aid frame so it cannot by moved by accident.",
+        name = self:GetText("lockWindow"),
+        desc = self:GetText("lockWindowHelp"),
         type = "toggle",
         set = function(info, val) if val then self:Lock() else self:Unlock() end end,
         get = function(info) return self.saved.locked end,
@@ -380,8 +196,8 @@ function LA:OnInitialize()
         order = 1
       },
       restoreactions = {
-        name = "Restore Actions",
-        desc = "When re-learning talent-based abilities, restore their position on your action bars.",
+        name = self:GetText("restoreActions"),
+        desc = self:GetText("restoreActionsHelp"),
         type = "toggle",
         set = function(info, val) if val then self.saved.restoreActions = val end end,
         get = function(info) return self.saved.restoreActions end,
@@ -389,17 +205,17 @@ function LA:OnInitialize()
         order = 2
       },
       filter = {
-        name = "Show Learn/Unlearn Messages",
-        desc = 'Show All: Blizzard default.  Summarize: Reduce the messages to a one or two line compact form.  Show None: Do not display any learn/unlearn messages in the chat log.',
+        name = self:GetText("showLearnSpam"),
+        desc = self:GetText("showLearnSpamHelp"),
         type = "select",
         values = {
-          [FILTER_SHOW_ALL ] = "Show All",
-          [FILTER_SUMMARIZE] = "Summarize",
-          [FILTER_SHOW_NONE] = "Show None"
+          [LA.FILTER_SHOW_ALL ] = self:GetText("showAll"),
+          [LA.FILTER_SUMMARIZE] = self:GetText("summarize"),
+          [LA.FILTER_SHOW_NONE] = self:GetText("showNone")
         },
         set = function(info, val)
           self.saved.filterSpam = val
-          if val ~= FILTER_SHOW_ALL then
+          if val ~= LA.FILTER_SHOW_ALL then
             ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
           else
             ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
@@ -410,8 +226,8 @@ function LA:OnInitialize()
         order = 3
       },
       debug = {
-        name = "Debug Output",
-        desc = "Enables / disables printing debugging information to the chat frame.",
+        name = self:GetText("debugOutput"),
+        desc = self:GetText("debugOutputHelp"),
         type = "toggle",
         set = function(info, val) self.saved.debug = val end,
         get = function(info) return self.saved.debug end,
@@ -419,8 +235,8 @@ function LA:OnInitialize()
         order = 99
       },
       reset = {
-        name = "Reset Position",
-        desc = "Reset the position of the Learning Aid frame to the default.",
+        name = self:GetText("resetPosition"),
+        desc = self:GetText("resetPositionHelp"),
         type = "execute",
         func = "ResetFramePosition",
         width = "full",
@@ -429,20 +245,20 @@ function LA:OnInitialize()
       missing = {
         type = "group",
         inline = true,
-        name = "Find Missing Abilities",
+        name = self:GetText("findMissingAbilities"),
         order = 10,
         args = {
           search = {
-            name = "Search",
-            desc = "Search the spellbook and action bars to find spells or abilities which are not on any action bar.",
+            name = self:GetText("searchMissing"),
+            desc = self:GetText("searchMissingHelp"),
             type = "execute",
             func = "FindMissingActions",
 --            width = "full",
             order = 1
           },
           tracking = {
-            name = "Find Tracking Abilities",
-            desc = "If enabled, Find Missing Abilities will search for tracking abilities as well.",
+            name = self:GetText("findTracking"),
+            desc = self:GetText("findTrackingHelp"),
             type = "toggle",
             set = function(info, val) self.saved.tracking = val end,
             get = function(info, val) return self.saved.tracking end,
@@ -450,8 +266,8 @@ function LA:OnInitialize()
             order = 2
           },
           shapeshift = {
-            name = "Find Shapeshift Forms",
-            desc = "If enabled, Find Missing Abilities will search for forms, auras, stances, presences, etc.",
+            name = self:GetText("findShapeshift"),
+            desc = self:GetText("findShapeshiftHelp"),
             type = "toggle",
             set = function(info, val) self.saved.shapeshift = val end,
             get = function(info, val) return self.saved.shapeshift end,
@@ -459,8 +275,8 @@ function LA:OnInitialize()
             order = 3
           },
           macros = {
-            name = "Search Macros",
-            desc = "If enabled, Find Missing Abilities will search inside macros for spells.",
+            name = self:GetText("searchInsideMacros"),
+            desc = self:GetText("searchInsideMacrosHelp"),
             type = "toggle",
             set = function(info, val) self.saved.macros = val end,
             get = function(info, val) return self.saved.macros end,
@@ -470,15 +286,15 @@ function LA:OnInitialize()
         }
       },
       unlock = {
-        name = "Unlock frame",
-        desc = "Unlocks the Learning Aid frame so it can be moved.",
+        name = self:GetText("unlockWindow"),
+        desc = self:GetText("unlockWindowHelp"),
         type = "execute",
         guiHidden = true,
         func = "Unlock"
       },
       config = {
-        name = "Configure",
-        desc = "Open the Learning Aid configuration panel.",
+        name = self:GetText("configure"),
+        desc = self:GetText("configureHelp"),
         type = "execute",
         func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
         guiHidden = true
@@ -492,7 +308,7 @@ function LA:OnInitialize()
           add = {
             type = "group",
             name = "Add",
-            desc = "Add a button to the Learning Aid frame.",
+            desc = "Add a button to the Learning Aid window.",
             args = {
               spell = {
                 type = "input",
@@ -523,7 +339,7 @@ function LA:OnInitialize()
           remove = {
             type = "group",
             name = "Remove",
-            desc = "Remove a button from the Learning Aid frame.",
+            desc = "Remove a button from the Learning Aid window.",
             args = {
               spell = {
                 type = "input",
@@ -651,14 +467,14 @@ function LA:OnEnable()
   self:UpdateSpellBook()
   self:DiffActionBars()
   self:SaveActionBars()
-  if self.saved.filterSpam ~= FILTER_SHOW_ALL then
+  if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
 function LA:OnDisable()
   self:Hide()
   self.saved.enabled = false
-  if self.saved.filterSpam ~= FILTER_SHOW_ALL then
+  if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
     ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
@@ -778,7 +594,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self.retalenting = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    if self.saved.filterSpam == FILTER_SUMMARIZE then 
+    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then 
       local learned = formatSpells(self.spellsLearned)
       local unlearned = formatSpells(self.spellsUnlearned)
       if string.len(unlearned) > 0 then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
@@ -791,7 +607,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UI_ERROR_MESSAGE")
-    if self.saved.filterSpam == FILTER_SUMMARIZE then
+    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
       local unlearned = formatSpells(self.spellsUnlearned)
       if string.len(unlearned) > 0 then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
     end
@@ -800,7 +616,7 @@ function LA:PLAYER_TALENT_UPDATE()
     self.pendingTalentCount = self.pendingTalentCount - 1
     if self.pendingTalentCount <= 0 then
       --self.learning = false
-      if self.saved.filterSpam == FILTER_SUMMARIZE then
+      if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
         local learned = formatSpells(self.spellsLearned)
         if string.len(learned) > 0 then systemPrint(self:GetText("youHaveLearned", learned)) end
       end
@@ -811,7 +627,7 @@ function LA:PLAYER_TALENT_UPDATE()
   elseif self.learning then
     self.learning = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-    if self.saved.filterSpam == FILTER_SUMMARIZE then
+    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
       local learned = formatSpells(self.spellsLearned)
       if string.len(learned) > 0 then systemPrint(self:GetText("youHaveLearned", learned)) end
     end
@@ -914,7 +730,7 @@ function LA:CHAT_MSG_SYSTEM(message)
   end
 end
 function LA:PET_TALENT_UPDATE()
-  if self.saved.filterSpam == FILTER_SUMMARIZE then
+  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
     local petLearned = formatSpells(self.petLearned)
     local petUnlearned = formatSpells(self.petUnlearned)
     if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
@@ -924,7 +740,7 @@ function LA:PET_TALENT_UPDATE()
   wipe(self.petUnlearned)
 end
 function LA:PLAYER_LEVEL_UP()
-  if self.saved.filterSpam == FILTER_SUMMARIZE then
+  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
     local petLearned = formatSpells(self.petLearned)
     local petUnlearned = formatSpells(self.petUnlearned)
     if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
@@ -932,112 +748,6 @@ function LA:PLAYER_LEVEL_UP()
   end
   wipe(self.petLearned)
   wipe(self.petUnlearned)
-end
-function LA:DiffActionBars()
-  local spec = GetActiveTalentGroup()
-  for slot = 1, 120 do
-    local actionType = GetActionInfo(slot)
-    -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
-    if self.character.actions and 
-       self.character.actions[spec] and
-       self.character.actions[spec][slot] and
-       not actionType
-    then
-      if not self.character.unlearned then self.character.unlearned = {} end
-      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
-      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
-      self.character.unlearned[spec][slot][self.character.actions[spec][slot]] = true
-    end
-  end
-end
-function LA:UpdateCompanions()
-  self:UpdateCompanionType("MOUNT")
-  self:UpdateCompanionType("CRITTER")
-end
-function LA:UpdateCompanionType(kind)
-  if self.companionCache[kind] then
-    wipe(self.companionCache[kind])
-  else
-    self.companionCache[kind] = {}
-  end
-  local cache = self.companionCache[kind]
-  local count = GetNumCompanions(kind)
-  for i = 1, count do
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
-    if creatureName then 
-      cache[creatureName] = true
-    else
-      self:DebugPrint("Bad companion, kind = "..kind..", index = "..i)
-    end
-  end
-  self:DebugPrint("Updated companion type "..kind..", "..count.." companions found.")
-end
-function LA:DiffCompanions()
-  self:DiffCompanionType("MOUNT")
-  self:DiffCompanionType("CRITTER")
-end
-function LA:AddCompanion(kind, id)
-  if self.inCombat then
-    table.insert(self.queue, { action = "LEARN", id = id, kind = kind})
-  else
-    self:LearnSpell(kind, id)
-    self:AddButton(kind, id)
-  end
-end
-function LA:DiffCompanionType(kind)
-  local count = GetNumCompanions(kind)
-  local cache = self.companionCache[kind]
-  local updated
-  for i = 1, count do
-    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
-    if cache[creatureName] == nil then
-      self:DebugPrint("Found new companion, type "..kind..", index "..i)
-      cache[creatureName] = true
-      self:AddCompanion(kind, i)
-      updated = i
-      break
-    end
-  end
-  return updated
-end
-function LA:UpdateSpellBook()
-  self.spellBookCache = {}
-  local i = 1
-  local spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-  while spellName do
-    spellRank = tonumber(string.match(spellRank, "%d+")) or 0
-    local spellGlobalID = self:GlobalSpellID(i)
-    local spellIsPassive = IsPassiveSpell(i, BOOKTYPE_SPELL) or false
-    self.spellBookCache[i] = {
-      name = spellName,
-      rank = spellRank,
-      globalID = spellGlobalID,
-      passive = spellIsPassive,
-      spellBookID = i
-    }
-    i = i + 1
-    spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-  end
-  self:DebugPrint("Updated Spellbook, "..i.." spells found")
-end
-function LA:AddSpell(id)
-  if self.inCombat then
-    table.insert(self.queue, { action = "LEARN", id = id, kind = BOOKTYPE_SPELL })
-  else
-    self:LearnSpell(BOOKTYPE_SPELL, id)
-    if (not self.retalenting) and (not IsPassiveSpell(id, BOOKTYPE_SPELL)) then
-      -- Display button with draggable spell icon
-      self:AddButton(BOOKTYPE_SPELL, id)
-    end
-  end
-end
-function LA:RemoveSpell(id)
-  if self.inCombat then
-    table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL })
-  else
-    self:ClearButtonID(BOOKTYPE_SPELL, id)
-    self:ForgetSpell(id)
-  end
 end
 function LA:ProcessQueue()
   if self.inCombat then
@@ -1073,85 +783,6 @@ function LA:ProcessQueue()
   end
   self.queue = {}
 end
-function LA:DiffSpellBook()
-  local i = 1
-  local cache = self.spellBookCache
-  local updated = false
-  local spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-  local spellGlobalID = self:GlobalSpellID(i)
-  while spellName do
-    if cache[i] == nil or
-       cache[i].globalID ~= spellGlobalID then
-      -- if spell removed
-      if cache[i + 1] ~= nil and
-         cache[i+1].globalID == spellGlobalID then
-        self:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..(i))
-        self:UpdateSpellBook()
-        self:RemoveSpell(i)
-      else
-        self:DebugPrint("New spell found: "..spellName.." ("..spellRank..")") -- Old spell: "..cache[i + offset].name.." ("..cache[i + offset].rank..")")
-        self:UpdateSpellBook()
-        self:AddSpell(i)
-      end
-      updated = true
-      break
-    end
-    i = i + 1
-    spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
-    spellGlobalID = self:GlobalSpellID(i)
-  end
-  -- if the last spell in the spellbook is removed
-  if i == #cache and not updated then
-    self:DebugPrint("Last spell removed: "..cache[i].name.." ("..cache[i].rank..") id "..i)
-    self:UpdateSpellBook()
-    self:RemoveSpell(i)
-    updated = true
-  end
-  return updated
-end
-function LA:LearnSpell(kind, id)
-  local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
-    local button = buttons[i]
-    local buttonID = button:GetID()
-    if button.kind == kind and buttonID >= id then
-      button:SetID(buttonID + 1)
-      self:UpdateButton(button)
-    end
-  end
-  local spec = GetActiveTalentGroup()
-  if self.saved.restoreActions and
-      (not self.retalenting) and
-      kind == BOOKTYPE_SPELL and
-      self.character.unlearned and
-      self.character.unlearned[spec] then
-    local globalID = self:GlobalSpellID(id)
-    for slot, oldIDs in pairs(self.character.unlearned[spec]) do
-      local actionType = GetActionInfo(slot)
-      for oldID in pairs(oldIDs) do
-        --local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
-        if oldID == globalID and actionType == nil then
-          PickupSpell(id, BOOKTYPE_SPELL)
-          PlaceAction(slot)
-          self.character.unlearned[spec][slot][oldID] = nil
-        end
-      end
-    end
-  end
-end
-function LA:ForgetSpell(id)
-  local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
-    local button = buttons[i]
-    local buttonID = button:GetID()
-    if button.kind == BOOKTYPE_SPELL and buttonID > id then
-      button:SetID(buttonID - 1)
-      self:UpdateButton(button)
-    end
-  end
-end
 function LA:CreateButton()
   local frame = self.frame
   local buttons = frame.buttons
@@ -1186,12 +817,6 @@ function LA:CreateButton()
   button.iconTexture = _G[name.."IconTexture"]
   button.cooldown = _G[name.."Cooldown"]
   return button
-end
-function LA:SpellButton_OnHide(button)
-  self:DebugPrint("Hiding button "..button.index)
-  button:SetChecked(false)
-  button.iconTexture:SetVertexColor(1, 1, 1)
-  button.cooldown:Hide()
 end
 function LA:AddButton(kind, id)
   if kind == BOOKTYPE_SPELL then
@@ -1251,7 +876,7 @@ function LA:AddButton(kind, id)
       button:SetChecked(true)
     end
   else
-    print("AddButton(): Invalid button type "..kind)
+    self:DebugPrint("AddButton(): Invalid button type "..kind)
   end
   self:UpdateButton(button)
   frame:Show()
@@ -1268,204 +893,6 @@ function LA:ClearButtonID(kind, id)
     else
       self:DebugPrint("Button "..i.." has id "..buttons[i]:GetID().." which does not match "..id)
       i = i + 1
-    end
-  end
-end
-LA.castSlashCommands = {
-  [SLASH_USE1] = true,
-  [SLASH_USE2] = true,
-  [SLASH_USERANDOM1] = true,
-  [SLASH_USERANDOM2] = true,
-  [SLASH_CAST1] = true,
-  [SLASH_CAST2] = true,
-  [SLASH_CAST3] = true,
-  [SLASH_CAST4] = true,
-  [SLASH_CASTRANDOM1] = true,
-  [SLASH_CASTRANDOM2] = true,
-  [SLASH_CASTSEQUENCE1] = true,
-  [SLASH_CASTSEQUENCE2] = true
-}
-function LA:MacroSpells(macroText)
-  macroText = string.lower(macroText)
-  local spells = {}
-  local first, last, line
-  first, last, line = macroText:find("([^\n]+)[\n]?")
-  while first ~= nil do
-    self:DebugPrint("Line",line)
-    local lineFirst, lineLast, slash = line:find("^(/%S+)%s+")
-    if lineFirst ~= nil then
-      self:DebugPrint('Slash "'..slash..'"')
-      if self.castSlashCommands[slash] then
-        --self:DebugPrint("found slash command")
-        local token
-        local linePos = lineLast
-        local found = true
-        while found do
-          while found do
-            found = false
-            -- ignore reset=
-            lineFirst, lineLast = line:find("^reset=%S+%s*", linePos + 1)
-            if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore macro options
-            lineFirst, lineLast = line:find("^%[[^%]]*]", linePos + 1)
-            if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore whitespace and punctuation
-            lineFirst, lineLast = line:find("^[%s,;]+", linePos + 1)
-            if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore ranks
-            lineFirst, lineLast = line:find("^%([^%)]+%)", linePos + 1)
-            if lineLast ~= nil then linePos = lineLast; found = true end
-          end
-          found = false
-          lineFirst, lineLast, token = line:find("^([^%(%[,;]+)", linePos + 1)
-          if lineLast ~= nil then
-            token = strtrim(token)
-            linePos = lineLast
-            found = true
-            self:DebugPrint('Token: "'..token..'"')
-            spells[token] = true
-          end
-        end
-      end
-    end
-    first, last, line = macroText:find("([^\n]+)\n?", last + 1)
-  end
-  return spells
-end
-function LA:FindMissingActions()
-  if self.inCombat then
-    print("Learning Aid: Cannot do that in combat.")
-    return
-  end
-  local actions = {}
-  local types = {}
-  local subTypes = {}
-  local ranks = {}
-  local tracking = {}
-  local shapeshift = {}
-  local results = {}
-  local macroSpells = {}
-  local numTrackingTypes = GetNumTrackingTypes()
-  for trackingType = 1, numTrackingTypes do
-    local name, texture, active, category = GetTrackingInfo(trackingType)
-    if category == BOOKTYPE_SPELL then
-      tracking[name] = true
-    end
-  end
-  for slot = 1, 120 do
-    local actionType, actionID, actionSubType = GetActionInfo(slot)
-    if actionSubType == nil then
-      actionSubType = ""
-    end
-    if actionType == nil then
-      actionType = ""
-    end
-    -- development info
-    if not types[actionType] then
-      self:DebugPrint("Type "..actionType)
-      types[actionType] = true
-    end
-    if not subTypes[actionSubType] then
-      self:DebugPrint("Subtype "..actionSubType)
-      subTypes[actionSubType] = true
-    end
-    if actionType == "spell" then
-      actions[actionID] = true
-    elseif actionType == "macro" and actionID ~= 0 and self.saved.macros then
-      self:DebugPrint("Macro in slot", slot, "with ID", actionID)
-      local body = GetMacroBody(actionID)
-      local spells = self:MacroSpells(body)
-      for spell in pairs(spells) do
-        macroSpells[spell] = true
-      end
-    end
-  end
-  -- Macaroon support code
-  if self.saved.macros and Macaroon and Macaroon.Buttons then
-    for index, button in ipairs(Macaroon.Buttons) do
-      local buttonType = button[1].config.type
-      local macroText = button[1].config.macro
-      local storage = button[2]
-      if (buttonType == "macro") and (storage == 0) then
-        self:DebugPrint("Macaroon macro in slot", index)
-        local spells = self:MacroSpells(macroText)
-        for spell in pairs(spells) do
-          macroSpells[spell] = true
-        end
-      end
-    end
-  end
-  -- End Macaroon code
-  for actionID, info in ipairs(self.spellBookCache) do
-    if (not ranks[info.name]) or ranks[info.name].rank < info.rank then
-      ranks[info.name] = info
-    end
-  end
-  local numForms = GetNumShapeshiftForms()
-  for form = 1, numForms do
-    local formTexture, formName, formIsActive, formIsCastable = GetShapeshiftFormInfo(form)
-    shapeshift[formName] = true
-  end
-  for spellName, info in pairs(ranks) do
-    spellNameLower = string.lower(spellName)
-    if 
-      (not actions[info.spellBookID]) and -- spell is not on any action bar
-      (not info.passive)              and -- spell is not passive
-      -- spell is not a tracking spell, or displaying tracking spells has been enabled
-      ((not tracking[spellName]) or self.saved.tracking) and
-      ((not shapeshift[spellName]) or self.saved.shapeshift) and
-      (not macroSpells[spellNameLower])
-    then
-      self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
-      results[#results + 1] = info
-    end
-  end
-  table.sort(results, function (a, b) return a.spellBookID < b.spellBookID end)
-  for result = 1, #results do
-    self:AddButton(BOOKTYPE_SPELL, results[result].spellBookID)
-  end
-end
-function LA:SaveActionBars()
-  local spec = GetActiveTalentGroup()
-  if self.character.actions == nil then self.character.actions = {} end
-  if self.character.actions[spec] then
-    wipe(self.character.actions[spec])
-  else
-    self.character.actions[spec] = {}
-  end
-  local savedActions = self.character.actions[spec]
-  for actionSlot = 1, 120 do
-    local actionType, actionID, actionSubType, globalID = GetActionInfo(actionSlot)
-    if actionType == "spell" then
-      savedActions[actionSlot] = globalID
-    end
-  end
-end
-function LA:RestoreAction(globalID)
-  -- self.character.actions[spec][slot] = globalID
-  local spec = GetActiveTalentGroup()
-  if self.character.actions and self.character.actions[spec] then -- and self.character.actions[spec][globalID]
-    for actionSlot, id in pairs(self.character.actions[spec]) do
-      if id == globalID then
-        self:DebugPrint("RestoreAction("..globalID.."): Found action at action slot "..actionSlot)
-        --local actionType, actionID, actionSubType, slotGlobalID = GetActionInfo(actionSlot)
-        local actionType = GetActionInfo(actionSlot)
-        if actionType == nil then
-          local spellBookID
-          for index, info in ipairs(self.spellBookCache) do
-            if info.globalID == globalID then
-              spellBookID = info.spellBookID
-              self:DebugPrint("RestoreAction("..globalID.."): Found action at Spellbook ID "..spellBookID)
-              break
-            end
-          end
-          if spellBookID then
-            PickupSpell(spellBookID, BOOKTYPE_SPELL)
-            PlaceAction(actionSlot)
-          end
-        end
-      end
     end
   end
 end
@@ -1606,13 +1033,5 @@ function LA:ToggleLock()
     self:Unlock()
   else
     self:Lock()
-  end
-end
--- Transforms a spellbook ID into a global spell ID
-function LA:GlobalSpellID(id)
-  local link = GetSpellLink(id, BOOKTYPE_SPELL)
-  if link then
-    local globalID = string.match(link, "Hspell:([^\124]+)\124")
-    return tonumber(globalID)
   end
 end

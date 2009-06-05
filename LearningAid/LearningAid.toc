@@ -12,3 +12,9 @@ embeds.xml
 
 LearningAid.xml
 LearningAid.lua
+SpellButton.lua
+Companion.lua
+Spell.lua
+ActionBar.lua
+
+Locale\enUS.lua
