@@ -1,3 +1,7 @@
+# 1.07.2
+
+Added German translation kindly provided by Freydis88.
+
 # 1.07.1
 
 Fixed long-standing bug that caused the wrong companion to appear when
