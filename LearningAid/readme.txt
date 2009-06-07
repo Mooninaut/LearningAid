@@ -1,4 +1,4 @@
-Learning Aid version 1.07.1
+Learning Aid version 1.07.2
 Written by Jamash (Kil'jaeden US)
 Email: mooninaut@gmail.com
 
@@ -24,7 +24,7 @@ User Interface Reference
 Learning Aid Window
   Left-click and drag the titlebar to move the window.
   Right-click on the titlebar to bring up the menu.
-  Middle click on the titlebar to close the window.
+  Click the close box or middle-click on the titlebar to close the window.
 
 Action Buttons
   Left- or right-click to perform the action.

@@ -1,4 +1,4 @@
--- Learning Aid v1.07.1 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.07.2 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -66,7 +66,7 @@ function LA:OnInitialize()
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.07.1"
+  self.version = "1.07.2"
   self.saved.version = self.version
   self.character.version = self.version
   for key, value in pairs(defaults) do
@@ -303,7 +303,7 @@ function LA:OnInitialize()
         type = "group",
         name = "Test",
         desc = "Perform various tests with Learning Aid.",
-        guiHidden = true,
+        hidden = true,
         args = {
           add = {
             type = "group",
