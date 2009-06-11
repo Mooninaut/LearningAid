@@ -1,3 +1,7 @@
+# 1.07.3
+
+Fixed a bug that caused incorrect text to appear on the context menu.
+
 # 1.07.2
 
 Added German translation kindly provided by Freydis88.

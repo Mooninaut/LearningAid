@@ -1,4 +1,4 @@
--- Learning Aid v1.07.2 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.07.3 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -66,7 +66,7 @@ function LA:OnInitialize()
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.07.2"
+  self.version = "1.07.3"
   self.saved.version = self.version
   self.character.version = self.version
   for key, value in pairs(defaults) do
@@ -380,7 +380,7 @@ function LA:OnInitialize()
     }
   }
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
-  self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self:GetText("title"))
+  self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self:GetText("title").." "..self.version)
   hooksecurefunc("ConfirmTalentWipe", function() 
     self:DebugPrint("ConfirmTalentWipe")
     self:SaveActionBars()
@@ -469,6 +469,15 @@ function LA:OnEnable()
   self:SaveActionBars()
   if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+  end
+  if self.saved.locked then
+    self.menuTable[1].text = self:GetText("unlockPosition")
+  else
+    self.saved.locked = false
+  end
+  if self.saved.x and self.saved.y then
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
   end
 end
 function LA:OnDisable()
@@ -642,11 +651,6 @@ function LA:PLAYER_ENTERING_WORLD()
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
 end
 function LA:VARIABLES_LOADED()
-  if self.saved.locked then
-    self.menuTable[1].text = self:GetText("unlockPosition")
-  else
-    self.saved.locked = false
-  end
   if self.saved.x and self.saved.y then
     self.frame:ClearAllPoints()
     self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
