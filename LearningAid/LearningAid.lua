@@ -1,7 +1,21 @@
--- Learning Aid v1.07.3 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.08 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
+
+--print("Learning Aid: Event Testing")
+local companionEvent
+if GetNumCompanions("CRITTER") == 0 and GetNumCompanions("MOUNT") == 0 then
+  companionEvent = "COMPANION_UPDATE"
+else
+  companionEvent = "UPDATE_BINDINGS"
+end
+LA:RegisterEvent(companionEvent, function ()
+  --print("Learning Aid: Companion Update Debug Message")
+  LA:UpdateCompanions()
+  LA:UnregisterEvent(companionEvent)
+end)
+
 LA.strings = {}
 
 LA.FILTER_SHOW_ALL  = 0
@@ -46,6 +60,7 @@ local function spellSpamFilter(chatFrame, event, message, ...)
 end
 local defaults = {
   macros = true,
+  totem = true,
   enabled = true,
   restoreActions = true,
   filterSpam = LA.FILTER_SUMMARIZE
@@ -66,7 +81,7 @@ function LA:OnInitialize()
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.07.3"
+  self.version = "1.08"
   self.saved.version = self.version
   self.character.version = self.version
   for key, value in pairs(defaults) do
@@ -95,10 +110,14 @@ function LA:OnInitialize()
   self.spellsUnlearned = {}
   self.petLearned = {}
   self.petUnlearned = {}
-
+  self.companionCache = {
+    MOUNT = {},
+    CRITTER = {}
+  }
   -- create main frame
   local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
   self.frame = frame
+  frame:Hide()
   frame:SetWidth(self.width)
   frame:SetHeight(self.titleHeight)
   frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
@@ -108,7 +127,6 @@ function LA:OnInitialize()
   frame:SetScript("OnHide", function () self:OnHide() end)
   frame.buttons = {}
   frame.visible = 0
-  frame:Hide()
   local backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -261,7 +279,7 @@ function LA:OnInitialize()
             desc = self:GetText("findTrackingHelp"),
             type = "toggle",
             set = function(info, val) self.saved.tracking = val end,
-            get = function(info, val) return self.saved.tracking end,
+            get = function(info) return self.saved.tracking end,
             width = "full",
             order = 2
           },
@@ -270,7 +288,7 @@ function LA:OnInitialize()
             desc = self:GetText("findShapeshiftHelp"),
             type = "toggle",
             set = function(info, val) self.saved.shapeshift = val end,
-            get = function(info, val) return self.saved.shapeshift end,
+            get = function(info) return self.saved.shapeshift end,
             width = "full",
             order = 3
           },
@@ -279,7 +297,7 @@ function LA:OnInitialize()
             desc = self:GetText("searchInsideMacrosHelp"),
             type = "toggle",
             set = function(info, val) self.saved.macros = val end,
-            get = function(info, val) return self.saved.macros end,
+            get = function(info) return self.saved.macros end,
             width = "full",
             order = 4
           }
@@ -379,6 +397,18 @@ function LA:OnInitialize()
       }
     }
   }
+  local class, enClass = UnitClass("player")
+  if GetMultiCastTotemSpells and enClass == "SHAMAN" then
+    self.options.args.missing.args.totem = {
+      name = self:GetText("findTotem"),
+      desc = self:GetText("findTotemHelp"),
+      type = "toggle",
+      set = function(info, val) self.saved.totem = val end,
+      get = function(info) return self.saved.totem end,
+      width = "full",
+      order = 4
+    }
+  end
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self:GetText("title").." "..self.version)
   hooksecurefunc("ConfirmTalentWipe", function() 
@@ -463,7 +493,6 @@ function LA:OnEnable()
   self:RegisterEvent("CHAT_MSG_SYSTEM", "OnEvent")
   self:RegisterEvent("PET_TALENT_UPDATE", "OnEvent")
   self:RegisterEvent("PLAYER_LEVEL_UP", "OnEvent")
-  self:UpdateCompanions()
   self:UpdateSpellBook()
   self:DiffActionBars()
   self:SaveActionBars()
@@ -510,7 +539,7 @@ end
 function LA:COMPANION_UPDATE()
   local frame = self.frame
   local buttons = frame.buttons
-  for i = 1, frame.visible do
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     local kind = button.kind
     if kind == "MOUNT" or kind == "CRITTER" then
@@ -895,7 +924,7 @@ function LA:ClearButtonID(kind, id)
       self:DebugPrint("Clearing button "..i.." with ID "..buttons[i]:GetID())
       self:ClearButtonIndex(i)
     else
-      self:DebugPrint("Button "..i.." has id "..buttons[i]:GetID().." which does not match "..id)
+      --self:DebugPrint("Button "..i.." has id "..buttons[i]:GetID().." which does not match "..id)
       i = i + 1
     end
   end

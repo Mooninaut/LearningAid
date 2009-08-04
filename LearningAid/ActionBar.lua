@@ -104,13 +104,29 @@ function LA:FindMissingActions()
   local ranks = {}
   local tracking = {}
   local shapeshift = {}
+  local totem = {}
   local results = {}
   local macroSpells = {}
   local numTrackingTypes = GetNumTrackingTypes()
-  for trackingType = 1, numTrackingTypes do
-    local name, texture, active, category = GetTrackingInfo(trackingType)
-    if category == BOOKTYPE_SPELL then
-      tracking[name] = true
+  if not self.saved.tracking then
+    for trackingType = 1, numTrackingTypes do
+      local name, texture, active, category = GetTrackingInfo(trackingType)
+      if category == BOOKTYPE_SPELL then
+        tracking[name] = true
+      end
+    end
+  end
+  local localClass, enClass = UnitClass("player")
+  if (not self.saved.totem) and enClass == "SHAMAN" and GetMultiCastTotemSpells then
+    self:DebugPrint("Searching for totems")
+    for totemType = 1, MAX_TOTEMS do
+      local totemSpells = {GetMultiCastTotemSpells(totemType)}
+      for index, globalID in ipairs(totemSpells) do
+        -- name, rank, icon, cost, isFunnel, powerType, castTime, minRange, maxRange = GetSpellInfo(spell)
+        local totemName = GetSpellInfo(globalID)
+        totem[totemName] = true
+        self:DebugPrint("Found totem "..totemName)
+      end
     end
   end
   for slot = 1, 120 do
@@ -162,10 +178,12 @@ function LA:FindMissingActions()
       ranks[info.name] = info
     end
   end
-  local numForms = GetNumShapeshiftForms()
-  for form = 1, numForms do
-    local formTexture, formName, formIsActive, formIsCastable = GetShapeshiftFormInfo(form)
-    shapeshift[formName] = true
+  if self.saved.shapeshift then
+    local numForms = GetNumShapeshiftForms()
+    for form = 1, numForms do
+      local formTexture, formName, formIsActive, formIsCastable = GetShapeshiftFormInfo(form)
+      shapeshift[formName] = true
+    end
   end
   for spellName, info in pairs(ranks) do
     spellNameLower = string.lower(spellName)
@@ -173,8 +191,9 @@ function LA:FindMissingActions()
       (not actions[info.spellBookID]) and -- spell is not on any action bar
       (not info.passive)              and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
-      ((not tracking[spellName]) or self.saved.tracking) and
-      ((not shapeshift[spellName]) or self.saved.shapeshift) and
+      (not tracking[spellName]) and
+      (not shapeshift[spellName]) and
+      (not totem[spellName]) and
       (not macroSpells[spellNameLower])
     then
       self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")

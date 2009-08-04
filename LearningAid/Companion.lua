@@ -1,5 +1,6 @@
 local LA = LearningAid
 function LA:UpdateCompanions()
+  if not self.companionCache then self.companionCache = {} end
   self:UpdateCompanionType("MOUNT")
   self:UpdateCompanionType("CRITTER")
 end

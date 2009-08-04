@@ -1,3 +1,10 @@
+# 1.08
+
+Added an option to toggle whether to search for Shaman totems when
+searching for abilities missing from action bars.
+
+Fixed wrong companion bug (again).
+
 # 1.07.3
 
 Fixed a bug that caused incorrect text to appear on the context menu.

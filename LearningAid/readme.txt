@@ -1,4 +1,4 @@
-Learning Aid version 1.07.3
+Learning Aid version 1.08
 Written by Jamash (Kil'jaeden US)
 Email: mooninaut@gmail.com
 
@@ -87,12 +87,14 @@ Slash Commands
   Set whether /la missing searches for tracking abilities.
 
 /la shapeshift [on|off]
-  Set whether /la missing searches for shapeshift forms, stances, auras,
+  Set whether /la search will find shapeshift forms, stances, auras,
   presences, etc.
 
 /la macros [on|off]
-  Set whether /la missing searches inside macros for abilities in use.
+  Set whether /la search will look inside macros for abilities in use.
 
+/la totem [on|off]
+  Set whether /la search will find Shaman totems.
 
 Advanced Slash Commands
 

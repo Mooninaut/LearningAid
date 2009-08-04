@@ -33,5 +33,7 @@ LearningAid.strings.enUS = {
   unlockWindowHelp = "Unlocks the Learning Aid window so it can be moved.",
   configure = "Configure",
   configureHelp = "Open the Learning Aid configuration panel.",
-  errorInCombat = "Cannot do that in combat."
+  errorInCombat = "Cannot do that in combat.",
+  findTotem = "Find Totem Spells",
+  findTotemHelp = "If enabled, Find Missing Abilities will search for totem summoning spells."
 }
