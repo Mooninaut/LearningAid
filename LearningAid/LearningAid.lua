@@ -1,20 +1,7 @@
--- Learning Aid v1.08 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.09 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
-
---print("Learning Aid: Event Testing")
-local companionEvent
-if GetNumCompanions("CRITTER") == 0 and GetNumCompanions("MOUNT") == 0 then
-  companionEvent = "COMPANION_UPDATE"
-else
-  companionEvent = "UPDATE_BINDINGS"
-end
-LA:RegisterEvent(companionEvent, function ()
-  --print("Learning Aid: Companion Update Debug Message")
-  LA:UpdateCompanions()
-  LA:UnregisterEvent(companionEvent)
-end)
 
 LA.strings = {}
 
@@ -63,25 +50,30 @@ local defaults = {
   totem = true,
   enabled = true,
   restoreActions = true,
-  filterSpam = LA.FILTER_SUMMARIZE
+  filterSpam = LA.FILTER_SUMMARIZE,
 }
 function LA:GetText(id, ...)
-  local result = ""
+  if not id then
+    if self.DebugPrint then
+      self:DebugPrint("Nil supplied to GetText()")
+    end
+    return "Nil"
+  end
+  local result = "Invalid String ID '" .. id .. "'"
   if self.strings[self.locale] and self.strings[self.locale][id] then
     result = self.strings[self.locale][id]
   elseif self.strings.enUS[id] then
     result = self.strings.enUS[id]
   else
-    self:DebugPrint("Invalid string ID '"..id.."'")
+    self:DebugPrint(result)
   end
   return format(result, ...)
 end
-function LA:OnInitialize()
+function LA:SetDefaultSettings()
   if not LearningAid_Saved then LearningAid_Saved = {} end
   if not LearningAid_Character then LearningAid_Character = {} end
   self.saved = LearningAid_Saved
   self.character = LearningAid_Character
-  self.version = "1.08"
   self.saved.version = self.version
   self.character.version = self.version
   for key, value in pairs(defaults) do
@@ -89,7 +81,12 @@ function LA:OnInitialize()
       self.saved[key] = value
     end
   end
+  if not self.saved.ignore then self.saved.ignore = {} end
+end
+function LA:OnInitialize()
   self:DebugPrint("OnInitialize()")
+  self.version = "1.09"
+  self:SetDefaultSettings()
   self.titleHeight = 40
   self.width = 170
   self.buttonSpacing = 5
@@ -97,7 +94,6 @@ function LA:OnInitialize()
   local version, build, date, tocversion = GetBuildInfo()
   self.locale = GetLocale()
   self.tocVersion = tocversion
-  self.companionCache = {}
   self.menuHideDelay = 5
   self.inCombat = false
   self.retalenting = false
@@ -114,6 +110,8 @@ function LA:OnInitialize()
     MOUNT = {},
     CRITTER = {}
   }
+  LA.companionsReady = false
+
   -- create main frame
   local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
   self.frame = frame
@@ -240,7 +238,6 @@ function LA:OnInitialize()
           end
         end,
         get = function(info) return self.saved.filterSpam end,
-        --width = "full",
         order = 3
       },
       debug = {
@@ -271,7 +268,7 @@ function LA:OnInitialize()
             desc = self:GetText("searchMissingHelp"),
             type = "execute",
             func = "FindMissingActions",
---            width = "full",
+            -- width = "full",
             order = 1
           },
           tracking = {
@@ -300,6 +297,28 @@ function LA:OnInitialize()
             get = function(info) return self.saved.macros end,
             width = "full",
             order = 4
+          },
+          ignore = {
+            name = self:GetText("ignore"),
+            desc = self:GetText("ignoreHelp"),
+            type = "input",
+            guiHidden = true,
+            set = "Ignore"
+          },
+          unignore = {
+            name = self:GetText("unignore"),
+            desc = self:GetText("unignoreHelp"),
+            type = "input",
+            guiHidden = true,
+            set = "Unignore"
+          },
+          unignoreall = {
+            order = 5,
+            name = self:GetText("unignoreAll"),
+            desc = self:GetText("unignoreAllHelp"),
+            type = "execute",
+            -- width = "full",
+            func = "UnignoreAll"
           }
         }
       },
@@ -397,8 +416,8 @@ function LA:OnInitialize()
       }
     }
   }
-  local class, enClass = UnitClass("player")
-  if GetMultiCastTotemSpells and enClass == "SHAMAN" then
+  self.localClass, self.enClass = UnitClass("player")
+  if GetMultiCastTotemSpells and self.enClass == "SHAMAN" then
     self.options.args.missing.args.totem = {
       name = self:GetText("findTotem"),
       desc = self:GetText("findTotemHelp"),
@@ -457,6 +476,39 @@ function LA:OnInitialize()
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
   self:SetEnabledState(self.saved.enabled)
 end
+function LA:Ignore(info, str)
+  if #strtrim(str) == 0 and self.saved.ignore[self.localClass] then
+    -- print ignore list to the chat frame
+    for lowercase, titlecase in pairs(self.saved.ignore[self.localClass]) do
+      print(self:GetText("title")..": ".. self:GetText("listIgnored", titlecase))
+    end
+  end
+  for index, spell in pairs(self.spellBookCache) do
+    if string.lower(str) == string.lower(spell.name) then
+      if not self.saved.ignore[self.localClass] then
+        self.saved.ignore[self.localClass] = {}
+      end
+      self.saved.ignore[self.localClass][string.lower(spell.name)] = spell.name
+      self:UpdateButtons()
+      break
+    end
+  end
+end
+function LA:Unignore(info, str)
+  if not self.saved.ignore[self.localClass] then
+    return
+  end
+  local ignoreList = self.saved.ignore[self.localClass]
+  if ignoreList[string.lower(str)] then
+    ignoreList[string.lower(str)] = nil
+    self:UpdateButtons()
+  end
+end
+function LA:UnignoreAll(info)
+  if self.saved.ignore[self.localClass] then
+    wipe(self.saved.ignore[self.localClass])
+  end
+end
 function LA:ResetFramePosition()
   local frame = self.frame
   frame:ClearAllPoints()
@@ -478,7 +530,8 @@ function LA:OnEnable()
   self:DebugPrint("OnEnable()")
   self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
   self:RegisterEvent("COMPANION_LEARNED", "OnEvent")
-  --self:RegisterEvent("COMPANION_UPDATE")
+  self:RegisterEvent("COMPANION_UPDATE", "OnEvent")
+  self:RegisterEvent("UPDATE_BINDINGS", "OnEvent")
   --self:RegisterEvent("TRADE_SKILL_SHOW")
   --self:RegisterEvent("TRADE_SKILL_CLOSE")
   --self:RegisterEvent("SPELL_UPDATE_COOLDOWN")
@@ -494,6 +547,7 @@ function LA:OnEnable()
   self:RegisterEvent("PET_TALENT_UPDATE", "OnEvent")
   self:RegisterEvent("PLAYER_LEVEL_UP", "OnEvent")
   self:UpdateSpellBook()
+  self:UpdateCompanions()
   self:DiffActionBars()
   self:SaveActionBars()
   if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
@@ -516,68 +570,82 @@ function LA:OnDisable()
     ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
-function LA:PLAYER_REGEN_DISABLED()
-  self.inCombat = true
-  self.frame.closeButton:Disable()
-end
-function LA:PLAYER_REGEN_ENABLED()
-  self.inCombat = false
-  self.frame.closeButton:Enable()
-  self:ProcessQueue()
-end
-function LA:SPELLS_CHANGED()
-  if self.spellBookCache ~= nil then
-    if not self:DiffSpellBook() then
-      self:DebugPrint("Event SPELLS_CHANGED fired without spell changes")
+function LA:ACTIONBAR_SLOT_CHANGED(slot)
+-- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
+-- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
+-- self.character.actions[spec][1][2354] = true
+  
+  if self.untalenting then
+    -- something something on (slot)
+    local spec = GetActiveTalentGroup()
+    local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
+    local oldID = self.character.actions[spec][slot]
+    self:DebugPrint("Action Slot "..slot.." changed:",
+      (actionType or "")..",",
+      (actionID or "")..",",
+      (actionSubType or "")..",",
+      (globalID or "")..",",
+      (oldID or "")
+    )
+    if oldID and (actionType ~= "spell" or globalID ~= oldID) then
+      if not self.character.unlearned then self.character.unlearned = {} end
+      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
+      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
+      self.character.unlearned[spec][slot][oldID] = true
     end
+  end
+end
+function LA:CHAT_MSG_SYSTEM(message)
+  local spell = string.match(message, patterns.learnSpell)
+  local rank
+  if not spell then spell = string.match(message, patterns.learnAbility) end
+  if spell then
+    spell, rank = unRankSpell(spell)
+    self.spellsLearned[spell] = rank or ""
+    return
+  end
+  spell = string.match(message, patterns.unlearnSpell)
+  if spell then
+    --LearningAid:DebugPrint("Unlearned", spell)
+    spell, rank = unRankSpell(spell)
+    self.spellsUnlearned[spell] = rank or ""
+    return
+  end
+  spell = string.match(message, patterns.petLearnAbility)
+  if not spell then spell = string.match(message, patterns.petLearnSpell) end
+  if spell then
+    spell, rank = unRankSpell(spell)
+    self.petLearned[spell] = rank or ""
+    return
+  end
+  if not spell then spell = string.match(message, patterns.petUnlearnSpell) end
+  if spell then
+    spell, rank = unRankSpell(spell)
+    self.petUnlearned[spell] = rank or ""
+    return
   end
 end
 function LA:COMPANION_LEARNED()
   self:DiffCompanions()
-  --self:UpdateCompanions()
 end
 function LA:COMPANION_UPDATE()
-  local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, self:GetVisible() do
-    local button = buttons[i]
-    local kind = button.kind
-    if kind == "MOUNT" or kind == "CRITTER" then
-      local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, button:GetID())
-      if isSummoned then
-        button:SetChecked(true)
-      else
-        button:SetChecked(false)
+  if self.companionsReady then
+    local frame = self.frame
+    local buttons = frame.buttons
+    for i = 1, self:GetVisible() do
+      local button = buttons[i]
+      local kind = button.kind
+      if kind == "MOUNT" or kind == "CRITTER" then
+        local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, button:GetID())
+        if isSummoned then
+          button:SetChecked(true)
+        else
+          button:SetChecked(false)
+        end
       end
     end
-  end
-end
-function LA:TRADE_SKILL_SHOW()
-  local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
-    local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      if IsSelectedSpell(button:GetID(), button.kind) then
-        button:SetChecked(true)
-      else
-        button:SetChecked(false)
-      end
-    end
-  end
-end
-LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
-function LA:SPELL_UPDATE_COOLDOWN()
-  local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
-    local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      self:UpdateButton(button)
-    elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
-      local start, duration, enable = GetCompanionCooldown(button.kind, button:GetID())
-      CooldownFrame_SetTimer(button.cooldown, start, duration, enable);
-    end
+  else
+    self:UpdateCompanions()
   end
 end
 function LA:CURRENT_SPELL_CAST_CHANGED()
@@ -590,41 +658,44 @@ function LA:CURRENT_SPELL_CAST_CHANGED()
     end
   end
 end
-function LA:UNIT_SPELLCAST_START(unit, spell)
-  if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
-    self:DebugPrint("Talent swap initiated")
-    self.retalenting = true
-    wipe(self.spellsLearned)
-    wipe(self.spellsUnlearned)
-    self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
-    self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
+function LA:PET_TALENT_UPDATE()
+  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
+    local petLearned = formatSpells(self.petLearned)
+    local petUnlearned = formatSpells(self.petUnlearned)
+    if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
+    if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
   end
+  wipe(self.petLearned)
+  wipe(self.petUnlearned)
 end
-function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
-  if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
-    self:DebugPrint("Talent swap canceled")
-    self.retalenting = false
-    self:UnregisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
-    self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
+function LA:PLAYER_ENTERING_WORLD()
+  self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
+end
+function LA:PLAYER_LEAVING_WORLD()
+  self:UnregisterEvent("SPELLS_CHANGED", "OnEvent")
+  self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnEvent")
+end
+function LA:PLAYER_LEVEL_UP()
+  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
+    local petLearned = formatSpells(self.petLearned)
+    local petUnlearned = formatSpells(self.petUnlearned)
+    if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
+    if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
   end
+  wipe(self.petLearned)
+  wipe(self.petUnlearned)
 end
-local function formatSpells(ranks)
-  local spells = {}
-  for spell, rank in pairs(ranks) do table.insert(spells, spell) end
-  table.sort(spells)
-  local strings = {}
-  for index, spell in ipairs(spells) do
-    if ranks[spell] == "" then 
-      table.insert(strings, spell)
-    else
-      table.insert(strings, spell .." (Rank " .. ranks[spell] .. ")")
-    end
-  end
-  return table.concat(strings, ", ")
+function LA:PLAYER_LOGOUT()
+  self:SaveActionBars()
 end
-local systemInfo = ChatTypeInfo["SYSTEM"]
-local function systemPrint(message)
-  DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
+function LA:PLAYER_REGEN_DISABLED()
+  self.inCombat = true
+  self.frame.closeButton:Disable()
+end
+function LA:PLAYER_REGEN_ENABLED()
+  self.inCombat = false
+  self.frame.closeButton:Enable()
+  self:ProcessQueue()
 end
 function LA:PLAYER_TALENT_UPDATE()
   if self.retalenting then
@@ -672,43 +743,58 @@ function LA:PLAYER_TALENT_UPDATE()
     wipe(self.spellsLearned)
   end
 end
-function LA:PLAYER_LEAVING_WORLD()
-  self:UnregisterEvent("SPELLS_CHANGED", "OnEvent")
-  self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnEvent")
-end
-function LA:PLAYER_ENTERING_WORLD()
-  self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
-end
-function LA:VARIABLES_LOADED()
-  if self.saved.x and self.saved.y then
-    self.frame:ClearAllPoints()
-    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
+function LA:SPELLS_CHANGED()
+  if not self.companionsReady then
+    self:UpdateCompanions()
+  end
+  if self.spellBookCache ~= nil and not self:DiffSpellBook() then
+    self:DebugPrint("Event SPELLS_CHANGED fired without spell changes")
   end
 end
-
-function LA:ACTIONBAR_SLOT_CHANGED(slot)
--- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
--- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
--- self.character.actions[spec][1][2354] = true
-  
-  if self.untalenting then
-    -- something something on (slot)
-    local spec = GetActiveTalentGroup()
-    local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
-    local oldID = self.character.actions[spec][slot]
-    self:DebugPrint("Action Slot "..slot.." changed:",
-      (actionType or "")..",",
-      (actionID or "")..",",
-      (actionSubType or "")..",",
-      (globalID or "")..",",
-      (oldID or "")
-    )
-    if oldID and (actionType ~= "spell" or globalID ~= oldID) then
-      if not self.character.unlearned then self.character.unlearned = {} end
-      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
-      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
-      self.character.unlearned[spec][slot][oldID] = true
+function LA:SPELL_UPDATE_COOLDOWN()
+  local frame = self.frame
+  local buttons = frame.buttons
+  for i = 1, frame.visible do
+    local button = buttons[i]
+    if button.kind == BOOKTYPE_SPELL then
+      self:UpdateButton(button)
+    elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
+      local start, duration, enable = GetCompanionCooldown(button.kind, button:GetID())
+      CooldownFrame_SetTimer(button.cooldown, start, duration, enable);
     end
+  end
+end
+function LA:TRADE_SKILL_SHOW()
+  local frame = self.frame
+  local buttons = frame.buttons
+  for i = 1, frame.visible do
+    local button = buttons[i]
+    if button.kind == BOOKTYPE_SPELL then
+      if IsSelectedSpell(button:GetID(), button.kind) then
+        button:SetChecked(true)
+      else
+        button:SetChecked(false)
+      end
+    end
+  end
+end
+LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
+function LA:UNIT_SPELLCAST_START(unit, spell)
+  if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
+    self:DebugPrint("Talent swap initiated")
+    self.retalenting = true
+    wipe(self.spellsLearned)
+    wipe(self.spellsUnlearned)
+    self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
+    self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
+  end
+end
+function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spell)
+  if unit == "player" and (spell == self.activatePrimarySpec or spell == self.activateSecondarySpec) then
+    self:DebugPrint("Talent swap canceled")
+    self.retalenting = false
+    self:UnregisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
+    self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
   end
 end
 function LA:UI_ERROR_MESSAGE()
@@ -719,8 +805,34 @@ function LA:UI_ERROR_MESSAGE()
     self.untalenting = false
   end
 end
-function LA:PLAYER_LOGOUT()
-  self:SaveActionBars()
+function LA:UPDATE_BINDINGS()
+  if self.companionsReady or self:UpdateCompanions() then
+    self:UnregisterEvent("UPDATE_BINDINGS")
+  end
+end
+function LA:VARIABLES_LOADED()
+  if self.saved.x and self.saved.y then
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
+  end
+end
+local function formatSpells(ranks)
+  local spells = {}
+  for spell, rank in pairs(ranks) do table.insert(spells, spell) end
+  table.sort(spells)
+  local strings = {}
+  for index, spell in ipairs(spells) do
+    if ranks[spell] == "" then 
+      table.insert(strings, spell)
+    else
+      table.insert(strings, spell .." (Rank " .. ranks[spell] .. ")")
+    end
+  end
+  return table.concat(strings, ", ")
+end
+local systemInfo = ChatTypeInfo["SYSTEM"]
+local function systemPrint(message)
+  DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
 end
 local function unRankSpell(spell)
   local rank = string.match(spell, "%s*%([^%)]*%)%s*")
@@ -731,56 +843,6 @@ local function unRankSpell(spell)
     rankNumber = string.match(rank, "%d+")
   end
   return spell, rankNumber
-end
-function LA:CHAT_MSG_SYSTEM(message)
-  local spell = string.match(message, patterns.learnSpell)
-  local rank
-  if not spell then spell = string.match(message, patterns.learnAbility) end
-  if spell then
-    spell, rank = unRankSpell(spell)
-    self.spellsLearned[spell] = rank or ""
-    return
-  end
-  spell = string.match(message, patterns.unlearnSpell)
-  if spell then
-    --LearningAid:DebugPrint("Unlearned", spell)
-    spell, rank = unRankSpell(spell)
-    self.spellsUnlearned[spell] = rank or ""
-    return
-  end
-  spell = string.match(message, patterns.petLearnAbility)
-  if not spell then spell = string.match(message, patterns.petLearnSpell) end
-  if spell then
-    spell, rank = unRankSpell(spell)
-    self.petLearned[spell] = rank or ""
-    return
-  end
-  if not spell then spell = string.match(message, patterns.petUnlearnSpell) end
-  if spell then
-    spell, rank = unRankSpell(spell)
-    self.petUnlearned[spell] = rank or ""
-    return
-  end
-end
-function LA:PET_TALENT_UPDATE()
-  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-    local petLearned = formatSpells(self.petLearned)
-    local petUnlearned = formatSpells(self.petUnlearned)
-    if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
-    if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-  end
-  wipe(self.petLearned)
-  wipe(self.petUnlearned)
-end
-function LA:PLAYER_LEVEL_UP()
-  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-    local petLearned = formatSpells(self.petLearned)
-    local petUnlearned = formatSpells(self.petUnlearned)
-    if string.len(petUnlearned) > 0 then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
-    if string.len(petLearned) > 0 then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-  end
-  wipe(self.petLearned)
-  wipe(self.petUnlearned)
 end
 function LA:ProcessQueue()
   if self.inCombat then
@@ -841,14 +903,28 @@ function LA:CreateButton()
   button:SetAttribute("type3", "hideButton")
   button:SetAttribute("alt-type*", "hideButton")
   button:SetAttribute("shift-type1", "linkSpell")
+  button:SetAttribute("ctrl-type*", "toggleIgnore")
   button.hideButton = function(spellButton, mouseButton, down)
     if not self.inCombat then
       self:ClearButtonIndex(spellButton.index)
     end
   end
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
+  button.toggleIgnore = function(spellButton, mouseButton, down)
+    if spellButton.kind == BOOKTYPE_SPELL then
+      if self.saved.ignore[self.localClass] and
+         self.saved.ignore[self.localClass][string.lower(spellButton.spellName:GetText())] then
+        self:Unignore(nil, spellButton.spellName:GetText())
+      else
+        self:Ignore(nil, spellButton.spellName:GetText())
+      end
+      self:UpdateButton(spellButton)
+    end
+  end
   button.iconTexture = _G[name.."IconTexture"]
   button.cooldown = _G[name.."Cooldown"]
+  button.spellName = _G[name.."SpellName"]
+  button.subSpellName = _G[name.."SubSpellName"]
   return button
 end
 function LA:AddButton(kind, id)
@@ -1035,7 +1111,7 @@ function LA:TestRemove(kind, ...)
   end
 end
 function LA:DebugPrint(...)
-  if self.saved.debug and self.saved.enabled then
+  if self.saved and self.saved.debug and self.saved.enabled then
     print(self:GetText("title")..":", ...)
   end
 end
@@ -1067,4 +1143,9 @@ function LA:ToggleLock()
   else
     self:Lock()
   end
+end
+function LA:PurgeConfig()
+  wipe(self.saved)
+  wipe(self.character)
+  self:SetDefaultSettings()
 end

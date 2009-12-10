@@ -1,4 +1,4 @@
-Learning Aid version 1.08
+Learning Aid version 1.09
 Written by Jamash (Kil'jaeden US)
 Email: mooninaut@gmail.com
 
@@ -27,11 +27,13 @@ Learning Aid Window
   Click the close box or middle-click on the titlebar to close the window.
 
 Action Buttons
-  Left- or right-click to perform the action.
-  Middle-click to dismiss a button.  Dismissing the only button closes the
+  * Left- or right-click to perform the action.
+  * Middle-click to dismiss a button.  Dismissing the only button closes the
   window.
-  Shift-click on a button to create a chat link or paste the ability name into
+  * Shift-click on a button to create a chat link or paste the ability name into
   the macro window.
+  * Ctrl-click on a button to ignore the spell on it when searching for missing
+  actions.
 
 Slash Command Reference
 
@@ -84,7 +86,7 @@ Slash Commands
   Toggle whether the window is locked.
 
 /la tracking [on|off]
-  Set whether /la missing searches for tracking abilities.
+  Set whether /la search searches for tracking abilities.
 
 /la shapeshift [on|off]
   Set whether /la search will find shapeshift forms, stances, auras,
@@ -95,6 +97,18 @@ Slash Commands
 
 /la totem [on|off]
   Set whether /la search will find Shaman totems.
+
+/la ignore Name of Ability
+  Ignore this ability when using /la search.
+
+/la ignore
+  List all ignored abilities.
+
+/la unignore Name of Ability
+  No longer ignore this ability when using /la search.
+
+/la unignoreall
+  Clear all abilities from the ignore list.
 
 Advanced Slash Commands
 

@@ -1,3 +1,14 @@
+# 1.09
+
+The "Find Shapeshift forms" toggle was backwards.  Fixed.
+
+New Ignore Ability function.  Ctrl-click on an icon in the Learning Aid
+window to ignore that ability when using the Search feature.
+
+You can also use /la ignore Ability Name and /la unignore Ability Name
+
+/la unignoreall to reset the list of ignored abilities
+
 # 1.08
 
 Added an option to toggle whether to search for Shaman totems when

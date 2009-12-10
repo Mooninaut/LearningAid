@@ -108,6 +108,13 @@ function LA:FindMissingActions()
   local results = {}
   local macroSpells = {}
   local numTrackingTypes = GetNumTrackingTypes()
+  local localClass, enClass = UnitClass("player")
+  local ignore
+  if self.saved.ignore[localClass] then
+    ignore = self.saved.ignore[localClass]
+  else
+    ignore = {}
+  end
   if not self.saved.tracking then
     for trackingType = 1, numTrackingTypes do
       local name, texture, active, category = GetTrackingInfo(trackingType)
@@ -116,7 +123,6 @@ function LA:FindMissingActions()
       end
     end
   end
-  local localClass, enClass = UnitClass("player")
   if (not self.saved.totem) and enClass == "SHAMAN" and GetMultiCastTotemSpells then
     self:DebugPrint("Searching for totems")
     for totemType = 1, MAX_TOTEMS do
@@ -178,7 +184,7 @@ function LA:FindMissingActions()
       ranks[info.name] = info
     end
   end
-  if self.saved.shapeshift then
+  if not self.saved.shapeshift then
     local numForms = GetNumShapeshiftForms()
     for form = 1, numForms do
       local formTexture, formName, formIsActive, formIsCastable = GetShapeshiftFormInfo(form)
@@ -194,7 +200,8 @@ function LA:FindMissingActions()
       (not tracking[spellName]) and
       (not shapeshift[spellName]) and
       (not totem[spellName]) and
-      (not macroSpells[spellNameLower])
+      (not macroSpells[spellNameLower]) and
+      (not ignore[spellNameLower])
     then
       self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
       if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end

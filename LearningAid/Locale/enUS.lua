@@ -35,5 +35,14 @@ LearningAid.strings.enUS = {
   configureHelp = "Open the Learning Aid configuration panel.",
   errorInCombat = "Cannot do that in combat.",
   findTotem = "Find Totem Spells",
-  findTotemHelp = "If enabled, Find Missing Abilities will search for totem summoning spells."
+  findTotemHelp = "If enabled, Find Missing Abilities will search for totem summoning spells.",
+  -- Strings added in 1.09
+  ignore = "Ignore",
+  ignoreHelp = "Find Missing Abilities will ignore this ability.",
+  unignore = "Unignore",
+  unignoreHelp = "Find Missing Abilities will no longer ignore this ability.",
+  unignoreAll = "Unignore All",
+  unignoreAllHelp = "Clear the ignore list.",
+  listIgnored = "Ability %s is ignored.",
+  ctrlToIgnore = "|cFFFF2222Ctrl-click|r |cFFFFFFFFto toggle ignore.|r"
 }

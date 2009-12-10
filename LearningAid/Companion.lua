@@ -1,10 +1,16 @@
 local LA = LearningAid
 function LA:UpdateCompanions()
   if not self.companionCache then self.companionCache = {} end
-  self:UpdateCompanionType("MOUNT")
-  self:UpdateCompanionType("CRITTER")
+  if self:UpdateCompanionType("MOUNT") and 
+     self:UpdateCompanionType("CRITTER") then
+    self.companionsReady = true
+  else
+    self.companionsReady = false
+  end
+  return self.companionsReady
 end
 function LA:UpdateCompanionType(kind)
+  local okay = true
   if self.companionCache[kind] then
     wipe(self.companionCache[kind])
   else
@@ -18,9 +24,16 @@ function LA:UpdateCompanionType(kind)
       cache[creatureName] = true
     else
       self:DebugPrint("Bad companion, kind = "..kind..", index = "..i)
+      okay = false
+      break
     end
   end
-  self:DebugPrint("Updated companion type "..kind..", "..count.." companions found.")
+  if okay then
+    self:DebugPrint("Updated companion type "..kind..", "..count.." companions found.")
+    return count
+  else
+    return okay
+  end
 end
 function LA:DiffCompanions()
   self:DiffCompanionType("MOUNT")
