@@ -570,6 +570,34 @@ function LA:OnDisable()
     ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
+local function unRankSpell(spell)
+  local rank = string.match(spell, "%s*%([^%)]*%)%s*")
+  local rankNumber
+  if rank then
+    match = string.gsub(rank, "[%(%)]", "%%%1") -- turn rank into a match expression
+    spell = string.gsub(spell, match, "")
+    rankNumber = string.match(rank, "%d+")
+  end
+  return spell, rankNumber
+end
+local function formatSpells(ranks)
+  local spells = {}
+  for spell, rank in pairs(ranks) do table.insert(spells, spell) end
+  table.sort(spells)
+  local strings = {}
+  for index, spell in ipairs(spells) do
+    if ranks[spell] == "" then 
+      table.insert(strings, spell)
+    else
+      table.insert(strings, spell .." (Rank " .. ranks[spell] .. ")")
+    end
+  end
+  return table.concat(strings, ", ")
+end
+local systemInfo = ChatTypeInfo["SYSTEM"]
+local function systemPrint(message)
+  DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
+end
 function LA:ACTIONBAR_SLOT_CHANGED(slot)
 -- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
 -- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
@@ -815,34 +843,6 @@ function LA:VARIABLES_LOADED()
     self.frame:ClearAllPoints()
     self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
   end
-end
-local function formatSpells(ranks)
-  local spells = {}
-  for spell, rank in pairs(ranks) do table.insert(spells, spell) end
-  table.sort(spells)
-  local strings = {}
-  for index, spell in ipairs(spells) do
-    if ranks[spell] == "" then 
-      table.insert(strings, spell)
-    else
-      table.insert(strings, spell .." (Rank " .. ranks[spell] .. ")")
-    end
-  end
-  return table.concat(strings, ", ")
-end
-local systemInfo = ChatTypeInfo["SYSTEM"]
-local function systemPrint(message)
-  DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
-end
-local function unRankSpell(spell)
-  local rank = string.match(spell, "%s*%([^%)]*%)%s*")
-  local rankNumber
-  if rank then
-    match = string.gsub(rank, "[%(%)]", "%%%1") -- turn rank into a match expression
-    spell = string.gsub(spell, match, "")
-    rankNumber = string.match(rank, "%d+")
-  end
-  return spell, rankNumber
 end
 function LA:ProcessQueue()
   if self.inCombat then
