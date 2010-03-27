@@ -9,6 +9,10 @@ You can also use /la ignore Ability Name and /la unignore Ability Name
 
 /la unignoreall to reset the list of ignored abilities
 
+When the option "Show Learn/Unlearn Messages" is set to "Summarize",
+spells that are unlearned and immediately relearned while swapping
+talent specs are not printed to the chat log.
+
 # 1.08
 
 Added an option to toggle whether to search for Shaman totems when

@@ -488,6 +488,7 @@ function LA:Ignore(info, str)
       if not self.saved.ignore[self.localClass] then
         self.saved.ignore[self.localClass] = {}
       end
+      -- FIXME use global spell ID
       self.saved.ignore[self.localClass][string.lower(spell.name)] = spell.name
       self:UpdateButtons()
       break
@@ -498,6 +499,7 @@ function LA:Unignore(info, str)
   if not self.saved.ignore[self.localClass] then
     return
   end
+  -- FIXME use global spell ID
   local ignoreList = self.saved.ignore[self.localClass]
   if ignoreList[string.lower(str)] then
     ignoreList[string.lower(str)] = nil
@@ -731,7 +733,14 @@ function LA:PLAYER_TALENT_UPDATE()
     self.retalenting = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then 
+    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
+      -- don't print spells that are unlearned then immediately relearned
+      for spell, rank in pairs(self.spellsLearned) do
+        if self.spellsUnlearned[spell] then
+	  self.spellsLearned[spell] = nil
+	  self.spellsUnlearned[spell] = nil
+	end
+      end
       local learned = formatSpells(self.spellsLearned)
       local unlearned = formatSpells(self.spellsUnlearned)
       if string.len(unlearned) > 0 then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
@@ -911,6 +920,7 @@ function LA:CreateButton()
   end
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
+    -- FIXME create ignore api, this code violates encapsulation
     if spellButton.kind == BOOKTYPE_SPELL then
       if self.saved.ignore[self.localClass] and
          self.saved.ignore[self.localClass][string.lower(spellButton.spellName:GetText())] then
