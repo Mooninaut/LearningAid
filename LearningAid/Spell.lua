@@ -85,8 +85,8 @@ function LA:DiffSpellBook()
 end
 function LA:LearnSpell(kind, id)
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
+  local buttons = self.buttons
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()
     if button.kind == kind and buttonID >= id then
@@ -116,8 +116,8 @@ function LA:LearnSpell(kind, id)
 end
 function LA:ForgetSpell(id)
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
+  local buttons = buttons
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()
     if button.kind == BOOKTYPE_SPELL and buttonID > id then

@@ -1,4 +1,4 @@
--- Learning Aid v1.09 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.10 by Jamash (Kil'jaeden-US)
 
 LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
 local LA = LearningAid
@@ -85,22 +85,27 @@ function LA:SetDefaultSettings()
 end
 function LA:OnInitialize()
   self:DebugPrint("OnInitialize()")
-  self.version = "1.09"
+  self.version = "1.10"
   self:SetDefaultSettings()
-  self.titleHeight = 40
-  self.width = 170
-  self.buttonSpacing = 5
-  self.buttonSize = 37
+  self.titleHeight = 40 -- pixels
+  self.frameWidth = 170 -- pixels
+  self.verticalSpacing = 5 -- pixels
+  self.horizontalSpacing = 123 -- pixels
+  self.buttonSize = 37 -- pixels
+  self.width = 1 -- button columns
+  self.height = 0 -- button rows
+  self.visible = 0 -- buttons
   local version, build, date, tocversion = GetBuildInfo()
   self.locale = GetLocale()
   self.tocVersion = tocversion
-  self.menuHideDelay = 5
+  self.menuHideDelay = 5 -- seconds
   self.inCombat = false
   self.retalenting = false
   self.untalenting = false
   --self.learning = false
   self.activatePrimarySpec = GetSpellInfo(63645)
   self.activateSecondarySpec = GetSpellInfo(63644)
+  self.buttons = {}
   self.queue = {}
   self.spellsLearned = {}
   self.spellsUnlearned = {}
@@ -116,15 +121,13 @@ function LA:OnInitialize()
   local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
   self.frame = frame
   frame:Hide()
-  frame:SetWidth(self.width)
+  frame:SetWidth(self.frameWidth)
   frame:SetHeight(self.titleHeight)
   frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
   frame:SetMovable(true)
   frame:SetClampedToScreen(true)
   frame:SetScript("OnShow", function () self:OnShow() end)
   frame:SetScript("OnHide", function () self:OnHide() end)
-  frame.buttons = {}
-  frame.visible = 0
   local backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -135,7 +138,7 @@ function LA:OnInitialize()
 
   -- create title bar
   local titleBar = CreateFrame("Frame", "LearningAid_Frame_TitleBar", frame)
-  frame.titleBar = titleBar
+  self.titleBar = titleBar
   titleBar:SetPoint("TOPLEFT")
   titleBar:SetPoint("TOPRIGHT")
   titleBar:SetHeight(self.titleHeight)
@@ -147,7 +150,7 @@ function LA:OnInitialize()
 
   -- create close button
   local closeButton = CreateFrame("Button", "LearningAid_Frame_CloseButton", titleBar)
-  frame.closeButton = closeButton
+  self.closeButton = closeButton
   closeButton:SetWidth(32)
   closeButton:SetHeight(32)
   closeButton:SetPoint("RIGHT", titleBar, "RIGHT", -2, 0)
@@ -193,7 +196,7 @@ function LA:OnInitialize()
       if button == "MiddleButton" then
         LA:Hide()
       elseif button == "RightButton" then
-        EasyMenu(LA.menuTable, menu, titleBar, 0, 8, "MENU", LA.menuHideDelay)
+        EasyMenu(LA.menuTable, menu, "cursor", 0, 8, "MENU", LA.menuHideDelay)
       end
     end
   )
@@ -352,8 +355,8 @@ function LA:OnInitialize()
                 name = "Spell",
                 pattern = "^%d+$",
                 set = function(info, val)
-                  self:AddButton("spell", tonumber(val))
-                end,
+                  self:AddButton(BOOKTYPE_SPELL, tonumber(val))
+                end
               },
               mount = {
                 type = "input",
@@ -361,7 +364,7 @@ function LA:OnInitialize()
                 pattern = "^%d+$",
                 set = function(info, val)
                   self:AddButton("MOUNT", tonumber(val))
-                end,
+                end
               },
               critter = {
                 type = "input",
@@ -369,8 +372,22 @@ function LA:OnInitialize()
                 pattern = "^%d+$",
                 set = function(info, val)
                   self:AddButton("CRITTER", tonumber(val))
-                end,
-              }
+                end
+              },
+        all = {
+          name = "All",
+    desc = "The Kitchen Sink",
+    type = "execute",
+    func = function ()
+      local i = 1
+      local spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
+      while spellName do
+        self:AddButton(BOOKTYPE_SPELL, i)
+        i = i + 1
+        spellName, spellRank = GetSpellName(i, BOOKTYPE_SPELL)
+      end
+    end
+        }
             }
           },
           remove = {
@@ -383,7 +400,7 @@ function LA:OnInitialize()
                 name = "Spell",
                 pattern = "^%d+$",
                 set = function(info, val)
-                  self:ClearButtonID("spell", tonumber(val))
+                  self:ClearButtonID(BOOKTYPE_SPELL, tonumber(val))
                 end
               },
               mount = {
@@ -447,10 +464,15 @@ function LA:OnInitialize()
       self.learning = true
     end
   end)
-  --hooksecurefunc("LearnTalent", function (tab, talent, pet, group)
-  --  self:DebugPrint("LearnTalent", tab, talent, pet, group)
-  --  self:DebugPrint(GetTalentInfo(tab, talent, false, pet, group))
-  --end)
+  hooksecurefunc("SetCVar", function (cvar, value)
+    if cvar == nil then cvar = "" end
+    if value == nil then value = "" end
+    cvarLower = string.lower(cvar)
+    self:DebugPrint("SetCVar("..cvar..", "..value..")")
+    if cvarLower == "uiscale" or cvarLower == "useuiscale" then
+      self:AutoSetMaxHeight()
+    end      
+  end)
   self.LearnTalent = LearnTalent
   self.pendingTalents = {}
   self.pendingTalentCount = 0
@@ -477,6 +499,7 @@ function LA:OnInitialize()
   self:SetEnabledState(self.saved.enabled)
 end
 function LA:Ignore(info, str)
+  local strLower = string.lower(str)
   if #strtrim(str) == 0 and self.saved.ignore[self.localClass] then
     -- print ignore list to the chat frame
     for lowercase, titlecase in pairs(self.saved.ignore[self.localClass]) do
@@ -484,26 +507,34 @@ function LA:Ignore(info, str)
     end
   end
   for index, spell in pairs(self.spellBookCache) do
-    if string.lower(str) == string.lower(spell.name) then
+    local spellLower = string.lower(spell.name)
+    if strLower == spellLower then
       if not self.saved.ignore[self.localClass] then
         self.saved.ignore[self.localClass] = {}
       end
-      -- FIXME use global spell ID
-      self.saved.ignore[self.localClass][string.lower(spell.name)] = spell.name
+      self.saved.ignore[self.localClass][spellLower] = spell.name
       self:UpdateButtons()
       break
     end
   end
 end
 function LA:Unignore(info, str)
-  if not self.saved.ignore[self.localClass] then
-    return
+  if self.saved.ignore[self.localClass] then
+    local ignoreList = self.saved.ignore[self.localClass]
+    local strLower = string.lower(str)
+    if ignoreList[strLower] then
+      ignoreList[strLower] = nil
+      self:UpdateButtons()
+    end
   end
-  -- FIXME use global spell ID
-  local ignoreList = self.saved.ignore[self.localClass]
-  if ignoreList[string.lower(str)] then
-    ignoreList[string.lower(str)] = nil
-    self:UpdateButtons()
+end
+function LA:ToggleIgnore(spell)
+  local spellLower = string.lower(spell)
+  if self.saved.ignore[self.localClass] and
+     self.saved.ignore[self.localClass][spellLower] then
+    self:Unignore(nil, spellButton.spellName:GetText())
+  else
+    self:Ignore(nil, spellButton.spellName:GetText())
   end
 end
 function LA:UnignoreAll(info)
@@ -617,7 +648,7 @@ function LA:ACTIONBAR_SLOT_CHANGED(slot)
       (globalID or "")..",",
       (oldID or "")
     )
-    if oldID and (actionType ~= "spell" or globalID ~= oldID) then
+    if oldID and (actionType ~= BOOKTYPE_SPELL or globalID ~= oldID) then
       if not self.character.unlearned then self.character.unlearned = {} end
       if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
       if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
@@ -661,7 +692,7 @@ end
 function LA:COMPANION_UPDATE()
   if self.companionsReady then
     local frame = self.frame
-    local buttons = frame.buttons
+    local buttons = self.buttons
     for i = 1, self:GetVisible() do
       local button = buttons[i]
       local kind = button.kind
@@ -680,8 +711,8 @@ function LA:COMPANION_UPDATE()
 end
 function LA:CURRENT_SPELL_CAST_CHANGED()
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
+  local buttons = self.buttons
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     if button.kind == BOOKTYPE_SPELL then
       self:SpellButton_UpdateSelection(button)
@@ -720,11 +751,11 @@ function LA:PLAYER_LOGOUT()
 end
 function LA:PLAYER_REGEN_DISABLED()
   self.inCombat = true
-  self.frame.closeButton:Disable()
+  self.closeButton:Disable()
 end
 function LA:PLAYER_REGEN_ENABLED()
   self.inCombat = false
-  self.frame.closeButton:Enable()
+  self.closeButton:Enable()
   self:ProcessQueue()
 end
 function LA:PLAYER_TALENT_UPDATE()
@@ -737,9 +768,9 @@ function LA:PLAYER_TALENT_UPDATE()
       -- don't print spells that are unlearned then immediately relearned
       for spell, rank in pairs(self.spellsLearned) do
         if self.spellsUnlearned[spell] then
-	  self.spellsLearned[spell] = nil
-	  self.spellsUnlearned[spell] = nil
-	end
+    self.spellsLearned[spell] = nil
+    self.spellsUnlearned[spell] = nil
+  end
       end
       local learned = formatSpells(self.spellsLearned)
       local unlearned = formatSpells(self.spellsUnlearned)
@@ -790,8 +821,8 @@ function LA:SPELLS_CHANGED()
 end
 function LA:SPELL_UPDATE_COOLDOWN()
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
+  local buttons = self.buttons
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     if button.kind == BOOKTYPE_SPELL then
       self:UpdateButton(button)
@@ -803,8 +834,8 @@ function LA:SPELL_UPDATE_COOLDOWN()
 end
 function LA:TRADE_SKILL_SHOW()
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = 1, frame.visible do
+  local buttons = self.buttons
+  for i = 1, self:GetVisible() do
     local button = buttons[i]
     if button.kind == BOOKTYPE_SPELL then
       if IsSelectedSpell(button:GetID(), button.kind) then
@@ -889,7 +920,7 @@ function LA:ProcessQueue()
 end
 function LA:CreateButton()
   local frame = self.frame
-  local buttons = frame.buttons
+  local buttons = self.buttons
   local count = #buttons
   -- button global variable names start with "SpellButton" to work around an
   -- issue with the Blizzard Feedback Tool used in beta and on the PTR
@@ -901,13 +932,6 @@ function LA:CreateButton()
   subSpellName:SetTextColor(NORMAL_FONT_COLOR.r - 0.1, NORMAL_FONT_COLOR.g - 0.1, NORMAL_FONT_COLOR.b - 0.1)
   buttons[count + 1] = button
   button.index = count + 1
-  if count > 0 then
-    -- position relative to button above
-    button:SetPoint("TOP", buttons[count], "BOTTOM", 0, -self.buttonSpacing)
-  else
-    -- position relative to header
-    button:SetPoint("TOPLEFT", frame.titleBar, "BOTTOMLEFT", 16, 0)
-  end
   button:SetAttribute("type*", "spell")
   button:SetAttribute("type3", "hideButton")
   button:SetAttribute("alt-type*", "hideButton")
@@ -920,14 +944,8 @@ function LA:CreateButton()
   end
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
-    -- FIXME create ignore api, this code violates encapsulation
     if spellButton.kind == BOOKTYPE_SPELL then
-      if self.saved.ignore[self.localClass] and
-         self.saved.ignore[self.localClass][string.lower(spellButton.spellName:GetText())] then
-        self:Unignore(nil, spellButton.spellName:GetText())
-      else
-        self:Ignore(nil, spellButton.spellName:GetText())
-      end
+      self:ToggleIgnore(spellButton.spellName:GetText()))
       self:UpdateButton(spellButton)
     end
   end
@@ -950,7 +968,7 @@ function LA:AddButton(kind, id)
     end
   end
   local frame = self.frame
-  local buttons = frame.buttons
+  local buttons = self.buttons
   local visible = self:GetVisible()
   for i = 1, visible do
     if buttons[i].kind == kind and buttons[i]:GetID() == id then
@@ -964,8 +982,8 @@ function LA:AddButton(kind, id)
     self:DebugPrint("Adding button id "..id.." index "..button.index)
   else
   -- if bar has free buttons
-    button = buttons[frame.visible + 1]
-    self:DebugPrint("Changing button index "..(frame.visible + 1).." from id "..button:GetID().." to "..id)
+    button = buttons[self:GetVisible() + 1]
+    self:DebugPrint("Changing button index "..(self:GetVisible() + 1).." from id "..button:GetID().." to "..id)
     button:Show()
   end
 
@@ -998,13 +1016,14 @@ function LA:AddButton(kind, id)
     self:DebugPrint("AddButton(): Invalid button type "..kind)
   end
   self:UpdateButton(button)
+  self:AutoSetMaxHeight()
   frame:Show()
 end
 function LA:ClearButtonID(kind, id)
   local frame = self.frame
-  local buttons = frame.buttons
+  local buttons = self.buttons
   local i = 1
-  -- not using a for loop because frame.visible may change during the loop execution
+  -- not using a for loop because self.visible may change during the loop execution
   while i <= self:GetVisible() do
     if buttons[i].kind == kind and buttons[i]:GetID() == id then
       self:DebugPrint("Clearing button "..i.." with ID "..buttons[i]:GetID())
@@ -1015,6 +1034,54 @@ function LA:ClearButtonID(kind, id)
     end
   end
 end
+function LA:SetMaxHeight(newMaxHeight) -- in buttons, not pixels
+  self.maxHeight = newMaxHeight
+  self:ReshapeFrame()
+end
+function LA:GetMaxHeight()
+  return self.maxHeight
+end
+function LA:AutoSetMaxHeight()
+  local screenHeight = UIParent:GetHeight()
+  self:DebugPrint("Screen Height = ".. screenHeight)
+  local newMaxHeight = math.floor((UIParent:GetHeight()-self.titleHeight)/(self.buttonSize+self.verticalSpacing) - 3)
+  self:DebugPrint("Setting MaxHeight to " .. newMaxHeight)
+  self:SetMaxHeight(newMaxHeight)
+  return newMaxHeight
+end
+function LA:ReshapeFrame()
+  local newHeight
+  local newWidth
+  local maxHeight = self.maxHeight
+  local visible = self:GetVisible()
+  if visible > maxHeight then
+    newHeight = maxHeight
+    newWidth = math.ceil(visible / maxHeight)
+  else
+    newHeight = visible
+    newWidth = 1
+  end
+  local frame = self.frame
+  frame:SetHeight(self.titleHeight + 10 + (self.buttonSize + self.verticalSpacing) * newHeight)
+  frame:SetWidth(10 + (self.buttonSize + self.horizontalSpacing) * newWidth)
+  self.height = newHeight
+  self.width = newWidth
+  self:ParentButtons()
+end
+function LA:ParentButtons()
+  local buttons = self.buttons
+  local visible = self:GetVisible()
+  if visible >= 1 then
+    buttons[1]:SetPoint("TOPLEFT", self.titleBar, "BOTTOMLEFT", 16, 0)
+  end
+  for i = 2, visible do
+    if i <= self.height then
+      buttons[i]:SetPoint("TOPLEFT", buttons[i-1], "BOTTOMLEFT", 0, -self.verticalSpacing)
+    else
+      buttons[i]:SetPoint("TOPLEFT", buttons[i-self.height], "TOPRIGHT", self.horizontalSpacing, 0)
+    end
+  end
+end
 function LA:ClearButtonIndex(index)
 -- I have buttons 1 2 3 (4 5)
 -- I remove button 2
@@ -1022,8 +1089,9 @@ function LA:ClearButtonIndex(index)
 -- before, visible = 3
 -- after, visible = 2
   local frame = self.frame
-  local buttons = frame.buttons
-  for i = index, frame.visible - 1 do
+  local buttons = self.buttons
+  local visible = self:GetVisible()
+  for i = index, visible - 1 do
     local button = buttons[i]
     local nextButton = buttons[i + 1]
     button:SetID(nextButton:GetID())
@@ -1044,15 +1112,15 @@ function LA:ClearButtonIndex(index)
     self:UpdateButton(button)
     --end
   end
-  local visible = self:GetVisible()
   buttons[visible]:Hide()
   self:SetVisible(visible - 1)
+  self:ReshapeFrame()
 end
 function LA:SetVisible(visible)
-  frame = self.frame
-  frame.visible = visible
+  local frame = self.frame
+  self.visible = visible
   local top, left = frame:GetTop(), frame:GetLeft()
-  frame:SetHeight(self.titleHeight + 10 + (self.buttonSize + self.buttonSpacing) * visible)
+  frame:SetHeight(self.titleHeight + 10 + (self.buttonSize + self.verticalSpacing) * visible)
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
   if visible == 0 then
@@ -1060,17 +1128,16 @@ function LA:SetVisible(visible)
   end
 end
 function LA:GetVisible()
-  return self.frame.visible
+  return self.visible
 end
 function LA:Hide()
   local frame = self.frame
   if not self.inCombat then
-    for i = 1, frame.visible do
-      frame.buttons[i]:SetChecked(false)
-      frame.buttons[i]:Hide()
+    for i = 1, self:GetVisible() do
+      self.buttons[i]:SetChecked(false)
+      self.buttons[i]:Hide()
     end
-    frame.visible = 0
-    frame:Hide()
+    self:SetVisible(0)
   else
     table.insert(self.queue, { kind = "HIDE" })
   end

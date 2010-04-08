@@ -1,3 +1,8 @@
+# 1.10
+
+The Learning Aid window now grows wider when there are too many
+abilities on it to fit in one column.
+
 # 1.09
 
 The "Find Shapeshift forms" toggle was backwards.  Fixed.

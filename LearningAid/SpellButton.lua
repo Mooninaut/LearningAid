@@ -189,6 +189,6 @@ function LA:SpellButton_OnHide(button)
 end
 function LA:UpdateButtons()
   for i = 1, self:GetVisible() do
-    self:UpdateButton(self.frame.buttons[i])
+    self:UpdateButton(self.buttons[i])
   end
 end
