@@ -532,9 +532,9 @@ function LA:ToggleIgnore(spell)
   local spellLower = string.lower(spell)
   if self.saved.ignore[self.localClass] and
      self.saved.ignore[self.localClass][spellLower] then
-    self:Unignore(nil, spellButton.spellName:GetText())
+    self:Unignore(nil, spell)
   else
-    self:Ignore(nil, spellButton.spellName:GetText())
+    self:Ignore(nil, spell)
   end
 end
 function LA:UnignoreAll(info)
@@ -945,7 +945,7 @@ function LA:CreateButton()
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
     if spellButton.kind == BOOKTYPE_SPELL then
-      self:ToggleIgnore(spellButton.spellName:GetText()))
+      self:ToggleIgnore(spellButton.spellName:GetText())
       self:UpdateButton(spellButton)
     end
   end
