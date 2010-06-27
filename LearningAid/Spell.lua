@@ -1,4 +1,4 @@
-local LA = LearningAid
+local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
 
 -- Transforms a spellbook ID into a global spell ID
 function LA:GlobalSpellID(id)
@@ -116,7 +116,7 @@ function LA:LearnSpell(kind, id)
 end
 function LA:ForgetSpell(id)
   local frame = self.frame
-  local buttons = buttons
+  local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()

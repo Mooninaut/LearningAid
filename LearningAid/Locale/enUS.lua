@@ -1,4 +1,5 @@
-LearningAid.strings.enUS = {
+local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+LA.strings.enUS = {
   title = "Learning Aid",
   lockPosition = "Lock Position",
   unlockPosition = "Unlock Position",

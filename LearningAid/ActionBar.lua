@@ -1,4 +1,4 @@
-local LA = LearningAid
+local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
 LA.castSlashCommands = {
   [SLASH_USE1] = true,
   [SLASH_USE2] = true,

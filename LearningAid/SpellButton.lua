@@ -1,4 +1,4 @@
-local LA = LearningAid
+local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
 -- Adapted from SpellBookFrame.lua
 function LA:UpdateButton(button)
   local id = button:GetID();

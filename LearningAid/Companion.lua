@@ -1,4 +1,4 @@
-local LA = LearningAid
+local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
 function LA:UpdateCompanions()
   if not self.companionCache then self.companionCache = {} end
   if self:UpdateCompanionType("MOUNT") and 
