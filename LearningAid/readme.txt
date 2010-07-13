@@ -1,4 +1,4 @@
-Learning Aid version 1.10
+Learning Aid version 1.10.1
 Written by Jamash (Kil'jaeden US)
 Email: mooninaut@gmail.com
 

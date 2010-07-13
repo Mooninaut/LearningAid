@@ -1,9 +1,13 @@
+# 1.10.1
+
+Chinese localizations added (zhCN and zhTW), kindly provided by wowuicn.
+
 # 1.10
 
 The Learning Aid window now grows wider when there are too many
 abilities on it to fit in one column.
 
-Korean localization added.
+Korean localization added, kindly provided by talkswind.
 
 # 1.09
 

@@ -85,7 +85,7 @@ function LA:SetDefaultSettings()
 end
 function LA:OnInitialize()
   self:DebugPrint("OnInitialize()")
-  self.version = "1.10"
+  self.version = "1.10.1"
   self:SetDefaultSettings()
   self.titleHeight = 40 -- pixels
   self.frameWidth = 170 -- pixels
