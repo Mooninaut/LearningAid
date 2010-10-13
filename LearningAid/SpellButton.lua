@@ -4,13 +4,13 @@ function LA:UpdateButton(button)
   local id = button:GetID();
 
   local name = button:GetName()
-  local iconTexture = getglobal(name.."IconTexture")
-  local spellString = getglobal(name.."SpellName")
-  local subSpellString = getglobal(name.."SubSpellName")
-  local cooldown = getglobal(name.."Cooldown")
-  local autoCastableTexture = getglobal(name.."AutoCastable")
-  local highlightTexture = getglobal(name.."Highlight")
-  local normalTexture = getglobal(name.."NormalTexture")
+  local iconTexture = _G[name.."IconTexture"]
+  local spellString = _G[name.."SpellName"]
+  local subSpellString = _G[name.."SubSpellName"]
+  local cooldown = _G[name.."Cooldown"]
+  local autoCastableTexture = _G[name.."AutoCastable"]
+  local highlightTexture = _G[name.."Highlight"]
+  -- CATA -- local normalTexture = _G[name.."NormalTexture"]
   if not self.inCombat then
     button:Enable()
   end
@@ -30,7 +30,7 @@ function LA:UpdateButton(button)
       button.shine = nil
       highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
       button:SetChecked(0)
-      normalTexture:SetVertexColor(1.0, 1.0, 1.0)
+      -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
       return;
     end
 
@@ -45,9 +45,9 @@ function LA:UpdateButton(button)
       iconTexture:SetVertexColor(0.4, 0.4, 0.4)
     end
 
-    local spellName, subSpellName = GetSpellName(id, BOOKTYPE_SPELL)
+    local spellName, subSpellName = GetSpellBookItemName(id, BOOKTYPE_SPELL)
 
-    normalTexture:SetVertexColor(1.0, 1.0, 1.0)
+    -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
     highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     spellString:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 
@@ -90,7 +90,7 @@ end
 function LA:SpellButton_OnDrag(button)
   local id = button:GetID()
   if button.kind == BOOKTYPE_SPELL then
-    PickupSpell(id, button.kind)
+    PickupSpellBookItem(id, button.kind)
   elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
     PickupCompanion(button.kind, id)
   end
@@ -102,7 +102,7 @@ function LA:SpellButton_OnEnter(button)
   local kind = button.kind
   GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
   if kind == BOOKTYPE_SPELL then
-    if GameTooltip:SetSpell(id, BOOKTYPE_SPELL) then
+    if GameTooltip:SetSpellBookItem(id, BOOKTYPE_SPELL) then
       button.UpdateTooltip = function (...)
         --self:DebugPrint("Inner SpellButton_OnEnter")
         self:SpellButton_OnEnter(...)
@@ -128,7 +128,7 @@ end
 function LA:SpellButton_UpdateSelection(button)
   if button.kind == BOOKTYPE_SPELL then
     local id = button:GetID()
-    if IsSelectedSpell(id, BOOKTYPE_SPELL) then
+    if IsSelectedSpellBookItem(id, BOOKTYPE_SPELL) then
       button:SetChecked("true")
     else
       button:SetChecked("false")
@@ -145,7 +145,7 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
     end
     if ( IsModifiedClick("CHATLINK") ) then
       if ( MacroFrame and MacroFrame:IsShown() ) then
-        spellName, subSpellName = GetSpellName(id, BOOKTYPE_SPELL)
+        spellName, subSpellName = GetSpellBookItemName(id, BOOKTYPE_SPELL)
           if ( spellName and not IsPassiveSpell(id, BOOKTYPE_SPELL) ) then
             if ( subSpellName and (strlen(subSpellName) > 0) ) then
               ChatEdit_InsertLink(spellName.."("..subSpellName..")")

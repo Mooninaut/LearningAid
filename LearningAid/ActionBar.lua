@@ -41,17 +41,21 @@ function LA:MacroSpells(macroText)
             lineFirst, lineLast = line:find("^[%s,;]+", linePos + 1)
             if lineLast ~= nil then linePos = lineLast; found = true end
             -- ignore ranks
-            lineFirst, lineLast = line:find("^%([^%)]+%)", linePos + 1)
-            if lineLast ~= nil then linePos = lineLast; found = true end
+            -- CATA -- lineFirst, lineLast = line:find("^%([^%)]+%)", linePos + 1)
+            -- CATA -- if lineLast ~= nil then linePos = lineLast; found = true end
           end
           found = false
-          lineFirst, lineLast, token = line:find("^([^%(%[,;]+)", linePos + 1)
+          lineFirst, lineLast, token = line:find("^([^%[,;]+)", linePos + 1)
           if lineLast ~= nil then
             token = strtrim(token)
             linePos = lineLast
             found = true
             self:DebugPrint('Token: "'..token..'"')
             spells[token] = true
+            local status, id = GetSpellBookItemInfo(token)
+            if id then 
+              spells[id] = true
+            end
           end
         end
       end
@@ -101,15 +105,16 @@ function LA:FindMissingActions()
   local actions = {}
   local types = {}
   local subTypes = {}
-  local ranks = {}
   local tracking = {}
   local shapeshift = {}
   local totem = {}
   local results = {}
   local macroSpells = {}
+  local flyouts = {}
   local numTrackingTypes = GetNumTrackingTypes()
   local localClass, enClass = UnitClass("player")
   local ignore
+  local cache = self.spellBookCache
   if self.saved.ignore[localClass] then
     ignore = self.saved.ignore[localClass]
   else
@@ -129,9 +134,9 @@ function LA:FindMissingActions()
       local totemSpells = {GetMultiCastTotemSpells(totemType)}
       for index, globalID in ipairs(totemSpells) do
         -- name, rank, icon, cost, isFunnel, powerType, castTime, minRange, maxRange = GetSpellInfo(spell)
-        local totemName = GetSpellInfo(globalID)
-        totem[totemName] = true
-        self:DebugPrint("Found totem "..totemName)
+        --local totemName = GetSpellInfo(globalID)
+        totem[globalID] = true
+        --self:DebugPrint("Found totem "..totemName)
       end
     end
   end
@@ -154,6 +159,19 @@ function LA:FindMissingActions()
     end
     if actionType == "spell" then
       actions[actionID] = true
+    elseif actionType == "flyout" then
+      -- flyoutID = actionID
+      local name, description, size, flyoutKnown = GetFlyoutInfo(actionID)
+      if flyoutKnown then
+        flyouts[actionID] = true
+        for flyoutSlot = 1, size do
+          local globalID, known = GetFlyoutSlotInfo(actionID, flyoutSlot)
+          if known then
+            -- local spellBookID = FindSpellBookSlotBySpellID(globalID)
+            actions[globalID] = true
+          end
+        end
+      end
     elseif actionType == "macro" and actionID ~= 0 and self.saved.macros then
       self:DebugPrint("Macro in slot", slot, "with ID", actionID)
       local body = GetMacroBody(actionID)
@@ -179,33 +197,35 @@ function LA:FindMissingActions()
     end
   end
   -- End Macaroon code
-  for actionID, info in ipairs(self.spellBookCache) do
-    if (not ranks[info.name]) or ranks[info.name].rank < info.rank then
-      ranks[info.name] = info
-    end
-  end
   if not self.saved.shapeshift then
     local numForms = GetNumShapeshiftForms()
     for form = 1, numForms do
-      local formTexture, formName, formIsActive, formIsCastable = GetShapeshiftFormInfo(form)
-      shapeshift[formName] = true
+      local formTexture, formName, formIsCastable, formIsActive = GetShapeshiftFormInfo(form)
+      local status, globalID = GetSpellBookItemInfo(formName)
+      assert(globalID)
+      shapeshift[globalID] = true
     end
   end
-  for spellName, info in pairs(ranks) do
+  for globalID, info in pairs(cache) do
+    local spellName = info.name
     spellNameLower = string.lower(spellName)
-    if 
-      (not actions[info.spellBookID]) and -- spell is not on any action bar
-      (not info.passive)              and -- spell is not passive
+    if info.known and
+      (not actions[globalID]) and -- spell is not on any action bar
+      (not IsPassiveSpell(info.spellBookID, BOOKTYPE_SPELL)) and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
       (not tracking[spellName]) and
-      (not shapeshift[spellName]) and
-      (not totem[spellName]) and
+      (not shapeshift[globalID]) and
+      (not totem[globalID]) and
       (not macroSpells[spellNameLower]) and
+      (not macroSpells[globalID]) and
       (not ignore[spellNameLower])
     then
-      self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
-      results[#results + 1] = info
+      -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
+      self:DebugPrint("Spell "..info.name.." is not on any action bar.")
+      --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
+      table.insert(results, info)
+    elseif info.status == "FLYOUT" and
+      not flyouts[globalID] then
     end
   end
   table.sort(results, function (a, b) return a.spellBookID < b.spellBookID end)
@@ -238,6 +258,75 @@ function LA:RestoreAction(globalID)
           end
         end
       end
+    end
+  end
+end
+local actionBarAliases = {
+  default = 1,
+  lowerleft = 1,
+  alternate = 2,
+  farright = RIGHT_ACTIONBAR_PAGE, -- 3
+  nearright = LEFT_ACTIONBAR_PAGE, -- 4
+  bottomright = BOTTOMRIGHT_ACTIONBAR_PAGE, -- 5
+  left = BOTTOMLEFT_ACTIONBAR_PAGE, -- 6
+  bottomleft = BOTTOMLEFT_ACTIONBAR_PAGE,
+  cat = 7,
+  stealth = 7,
+  battle = 7,
+  shadowform = 7,
+  shadow = 7,
+  defensive = 8,
+  bear = 9,
+  berserker = 9,
+  moonkin = 10
+}
+function LA:CopyActionBar(barID)
+  if not self.barClipboard then
+    self.barClipboard = {}
+  else
+    wipe(self.barClipboard)
+  end
+  if type(barID) == "number" then
+    barID = math.floor(barID)
+    assert(barID >= 1 and barID <= 10)
+  elseif type(barID) == "string" and actionBarAliases[barID] then
+    barID = actionBarAliases[barID]
+  end
+  local barOffset = (barID - 1) * NUM_ACTIONBAR_BUTTONS
+  for i = 1, NUM_ACTIONBAR_BUTTONS do
+    local id = i + barOffset
+    if HasAction(id) then
+      local slot = {}
+      slot.type, slot.globalID, slot.subType = GetActionInfo(id)
+      self.barClipboard[i] = slot
+    end
+  end
+end
+function LA:PasteActionBar(barID)
+  if self.barClipboard then
+    if type(barID) == "string" then
+      barID = actionBarAliases[barID]
+    end
+    local barOffset = (barID - 1) * NUM_ACTIONBAR_BUTTONS
+    for i = 1, NUM_ACTIONBAR_BUTTONS do
+      local slot = self.barClipboard[i]
+      if slot then
+        if slot.type == "spell" then
+          PickupSpell(slot.globalID)
+        elseif slot.type == "companion" then
+          PickupCompanion(slot.subType, self.companionCache[slot.subType][slot.globalID].index)
+        elseif slot.type == "macro" then
+          PickupMacro(slot.globalID)
+        elseif slot.type == "equipmentset" then
+          PickupEquipmentSetByName(slot.globalID)
+        elseif slot.type == "item" then
+          PickupItem(slot.globalID)
+        end
+        PlaceAction(i + barOffset)
+      else
+        PickupAction(i + barOffset)
+      end
+      ClearCursor()
     end
   end
 end

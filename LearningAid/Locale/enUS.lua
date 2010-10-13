@@ -45,5 +45,7 @@ LA.strings.enUS = {
   unignoreAll = "Unignore All",
   unignoreAllHelp = "Clear the ignore list.",
   listIgnored = "Ability %s is ignored.",
-  ctrlToIgnore = "|cFFFF2222Ctrl-click|r |cFFFFFFFFto toggle ignore.|r"
+  ctrlToIgnore = "|cFFFF2222Ctrl-click|r |cFFFFFFFFto toggle ignore.|r",
+  -- Strings added in 1.11
+  trainAllPopup = "Train all available skills for"
 }

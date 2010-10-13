@@ -20,8 +20,8 @@ function LA:UpdateCompanionType(kind)
   local count = GetNumCompanions(kind)
   for i = 1, count do
     local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
-    if creatureName then 
-      cache[creatureName] = true
+    if creatureName then
+      cache[creatureSpellID] = { name = creatureName, index = i, npc = creatureID, icon = icon }
     else
       self:DebugPrint("Bad companion, kind = "..kind..", index = "..i)
       okay = false
@@ -50,16 +50,19 @@ end
 function LA:DiffCompanionType(kind)
   local count = GetNumCompanions(kind)
   local cache = self.companionCache[kind]
-  local updated
+  local updated = 0
   for i = 1, count do
     local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, i)
-    if cache[creatureName] == nil then
+    if not cache[creatureSpellID] then
       self:DebugPrint("Found new companion, type "..kind..", index "..i)
-      cache[creatureName] = true
+      cache[creatureSpellID] = { name = creatureName, index = i, npc = creatureID, icon = icon }
       self:AddCompanion(kind, i)
-      updated = i
-      break
+      updated = updated + 1
     end
   end
-  return updated
+  if updated > 0 then
+    return updated
+  else
+    return false
+  end
 end

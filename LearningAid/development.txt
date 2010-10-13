@@ -1,3 +1,11 @@
+# 1.11
+
+Updated for WoW 4.0.1 (Pre-Cataclysm patch)
+
+Includes new "Train All" button on skill and class trainers.
+
+Interface updated to 40000
+
 # 1.10.1
 
 Chinese localizations added (zhCN and zhTW), kindly provided by wowuicn.
