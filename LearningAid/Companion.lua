@@ -1,8 +1,13 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+-- Companion.lua
+
+local addonName, private = ...
+local LA = private.LA
+
 function LA:UpdateCompanions()
   if not self.companionCache then self.companionCache = {} end
-  if self:UpdateCompanionType("MOUNT") and 
-     self:UpdateCompanionType("CRITTER") then
+  local mount = self:UpdateCompanionType("MOUNT")
+  local critter = self:UpdateCompanionType("CRITTER")
+  if (mount > 0) or (critter > 0) then
     self.companionsReady = true
   else
     self.companionsReady = false
@@ -10,7 +15,6 @@ function LA:UpdateCompanions()
   return self.companionsReady
 end
 function LA:UpdateCompanionType(kind)
-  local okay = true
   if self.companionCache[kind] then
     wipe(self.companionCache[kind])
   else
@@ -24,16 +28,14 @@ function LA:UpdateCompanionType(kind)
       cache[creatureSpellID] = { name = creatureName, index = i, npc = creatureID, icon = icon }
     else
       self:DebugPrint("Bad companion, kind = "..kind..", index = "..i)
-      okay = false
+      count = -1
       break
     end
   end
-  if okay then
+  if count > 0 then
     self:DebugPrint("Updated companion type "..kind..", "..count.." companions found.")
-    return count
-  else
-    return okay
   end
+  return count
 end
 function LA:DiffCompanions()
   self:DiffCompanionType("MOUNT")

@@ -1,4 +1,5 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+local addonName, private = ...
+local LA = private.LA
 LA.strings.enUS = {
   title = "Learning Aid",
   lockPosition = "Lock Position",
@@ -47,5 +48,9 @@ LA.strings.enUS = {
   listIgnored = "Ability %s is ignored.",
   ctrlToIgnore = "|cFFFF2222Ctrl-click|r |cFFFFFFFFto toggle ignore.|r",
   -- Strings added in 1.11
-  trainAllPopup = "Train all available skills for"
+  trainAllButton = "Train All",
+  trainAllPopup = "Train all available skills for",
+  frameStrata = "Frame Strata",
+  frameStrataHelp = "Adjust what frames Learning Aid appears above and below.  Only change this if you have problems with frames overlapping each other.",
+  advanced = "Advanced settings"
 }

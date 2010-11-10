@@ -1,4 +1,5 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+local addonName, private = ...
+local LA = private.LA
 LA.strings.zhCN = {
   title = "Learning Aid",
   lockPosition = "锁定位置",

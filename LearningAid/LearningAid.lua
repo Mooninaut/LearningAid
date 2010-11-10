@@ -1,161 +1,142 @@
 -- Learning Aid v1.11 by Jamash (Kil'jaeden-US)
+-- LearningAid.lua
 
-LearningAid = LibStub("AceAddon-3.0"):NewAddon("LearningAid", "AceConsole-3.0", "AceEvent-3.0")
-local LA = LearningAid
+local addonName, private = ...
 
-LA.strings = {}
-
-LA.FILTER_SHOW_ALL  = 0
-LA.FILTER_SUMMARIZE = 1
-LA.FILTER_SHOW_NONE = 2
-LA.CONFIRM_TRAINER_BUY_ALL = 732297 -- magic number randomly chosen via /roll 1000000 to prevent users from accidentally spending hundreds of gold at a trainer
-
-LA.patterns = {
-  learnAbility    = ERR_LEARN_ABILITY_S,
-  learnSpell      = ERR_LEARN_SPELL_S,
-  unlearnSpell    = ERR_SPELL_UNLEARNED_S,
-  petLearnAbility = ERR_PET_LEARN_ABILITY_S,
-  petLearnSpell   = ERR_PET_LEARN_SPELL_S,
-  petUnlearnSpell = ERR_PET_SPELL_UNLEARNED_S
+private.debug = 0
+private.debugCount = 0
+private.shadow = { }
+private.wrappers = { }
+private.debugFlags = { }
+private.noLog = {
+  GetVisible = true,
+  GetText = true,
+  ListJoin = true
 }
-for name, pattern in pairs(LA.patterns) do
-  LA.patterns[name] = string.gsub(pattern, "%%s", "(.+)")
-end
 
-local function spellSpamFilter(chatFrame, event, message, ...)
-  LA:DebugPrint("spellSpamFilter: ", event, message, ...)
-  local spell
-  if LA.saved.filterSpam ~= LA.FILTER_SHOW_ALL and (
---    (
---      LA.untalenting or
---      LA.retalenting or
---     (LA.pendingTalentCount > 0) or
---     (LA.saved.filterSpam == LA.FILTER_SHOW_NONE) or
---      LA.learning
---    ) and (
-      string.match(message, LA.patterns.learnSpell) or 
-      string.match(message, LA.patterns.learnAbility) or
-      string.match(message, LA.patterns.unlearnSpell) or
---    )
---  ) or
-    string.match(message, LA.patterns.petLearnAbility) or
-    string.match(message, LA.patterns.petLearnSpell) or
-    string.match(message, LA.patterns.petUnlearnSpell))
-  then
-    LA:DebugPrint("Suppressing message")
-    return true -- do not display the message
-  else
-    LA:DebugPrint("Allowing message")
-    return false, message, ... -- pass the message along
-  end
-end
-
-local defaults = {
-  macros = true,
-  totem = true,
-  enabled = true,
-  restoreActions = true,
-  filterSpam = LA.FILTER_SUMMARIZE,
-}
-function LA:GetText(id, ...)
-  if not id then
-    if self.DebugPrint then
-      self:DebugPrint("Nil supplied to GetText()")
-    end
-    return "Nil"
-  end
-  local result = "Invalid String ID '" .. id .. "'"
-  if self.strings[self.locale] and self.strings[self.locale][id] then
-    result = self.strings[self.locale][id]
-  elseif self.strings.enUS[id] then
-    result = self.strings.enUS[id]
-  else
-    self:DebugPrint(result)
-  end
-  return format(result, ...)
-end
-function LA:SetDefaultSettings()
-  if not LearningAid_Saved then LearningAid_Saved = {} end
-  if not LearningAid_Character then LearningAid_Character = {} end
-  self.saved = LearningAid_Saved
-  self.character = LearningAid_Character
-  self.saved.version = self.version
-  self.character.version = self.version
-  for key, value in pairs(defaults) do
-    if self.saved[key] == nil then
-      self.saved[key] = value
-    end
-  end
-  if not self.saved.ignore then self.saved.ignore = {} end
-end
-function LA:OnInitialize()
-  self:DebugPrint("OnInitialize()")
-  self.version = "1.11"
-  self:SetDefaultSettings()
-  self.titleHeight = 40 -- pixels
-  self.frameWidth = 200 -- pixels
-  self.verticalSpacing = 5 -- pixels
-  self.horizontalSpacing = 153 -- pixels
-  self.buttonSize = 37 -- pixels
-  self.width = 1 -- button columns
-  self.height = 0 -- button rows
-  self.visible = 0 -- buttons
-  local version, build, buildDate, tocversion = GetBuildInfo()
-  self.locale = GetLocale()
-  self.tocVersion = tocversion
-  self.menuHideDelay = 5 -- seconds
-  self.inCombat = false
-  self.retalenting = false
-  self.untalenting = false
-  self.learning = false
-  self.activatePrimarySpec = 63645
-  self.activateSecondarySpec = 63644
-  self.buttons = {}
-  self.queue = {}
-  self.availableServices = {}
-  self.spellsLearned = {}
-  self.spellsUnlearned = {}
-  self.petLearned = {}
-  self.petUnlearned = {}
-  self.companionCache = {
-    MOUNT = {},
-    CRITTER = {}
-  }
-  LA.companionsReady = false
-
-  -- create main frame
-  local frame = CreateFrame("Frame", "LearningAid_Frame", UIParent)
-  self.frame = frame
-  frame:Hide()
-  frame:SetWidth(self.frameWidth)
-  frame:SetHeight(self.titleHeight)
-  frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
-  frame:SetMovable(true)
-  frame:SetClampedToScreen(true)
-  frame:SetScript("OnShow", function () self:OnShow() end)
-  frame:SetScript("OnHide", function () self:OnHide() end)
-  local backdrop = {
+local LA = { 
+  version = "1.11",
+  name = addonName,
+  titleHeight = 40, -- pixels
+  frameWidth = 200, -- pixels
+  verticalSpacing = 5, -- pixels
+  horizontalSpacing = 153, -- pixels
+  buttonSize = 37, -- pixels
+  width = 1, -- button columns
+  height = 0, -- button rows
+  visible = 0, -- buttons
+  strings = { },
+  FILTER_SHOW_ALL  = 0,
+  FILTER_SUMMARIZE = 1, -- default
+  FILTER_SHOW_NONE = 2,
+  CONFIRM_TRAINER_BUY_ALL = 732297, -- magic number randomly chosen via /roll 1000000 to prevent users from accidentally spending hundreds of gold at a trainer
+  patterns = {
+    learnAbility    = ERR_LEARN_ABILITY_S,
+    learnSpell      = ERR_LEARN_SPELL_S,
+    unlearnSpell    = ERR_SPELL_UNLEARNED_S,
+    petLearnAbility = ERR_PET_LEARN_ABILITY_S,
+    petLearnSpell   = ERR_PET_LEARN_SPELL_S,
+    petUnlearnSpell = ERR_PET_SPELL_UNLEARNED_S
+  },
+  defaults = {
+    macros = true,
+    totem = true,
+    enabled = true,
+    restoreActions = true,
+    filterSpam = 1, -- FILTER_SUMMARIZE
+    debugFlags = { },
+    ignore = { }
+  },
+  menuHideDelay = 5, -- seconds
+  pendingBuyCount = 0,
+  inCombat = false,
+  retalenting = false,
+  untalenting = false,
+  learning = false,
+  activatePrimarySpec = 63645,
+  activateSecondarySpec = 63644,
+  buttons = { },
+  queue = { },
+  availableServices = { },
+  spellsLearned = { name = { }, link = { } },
+  spellsUnlearned = { name = { }, link = { } },
+  petLearned = { },
+  petUnlearned = { },
+  companionCache = {
+    MOUNT = { },
+    CRITTER = { }
+  },
+  spellBookCache = { },
+  flyoutCache = { },
+--  events = { }, -- EVENT DEBUGGING
+  numSpells = 0,
+  companionsReady = false,
+  backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
     tile = false, tileSize = 16, edgeSize = 16,
     insets = { left = 4, right = 4, top = 4, bottom = 4 }
   }
-  frame:SetBackdrop(backdrop)
+}
+
+private.LA = LA
+_G[addonName] = LA
+
+LibStub("AceConsole-3.0"):Embed(LA)
+
+function private.onEvent(frame, event, ...)
+  LA[event](LA, ...)
+end
+
+function private.onEventDebug(frame, event, ...)
+  if LA.events[event] then
+    LA[event](LA, ...)
+  else
+    LA:DebugPrint(event)
+  end
+end
+
+LA.frame = CreateFrame("Frame", nil, UIParent)
+LA.frame:SetScript("OnEvent", private.onEvent)
+LA.frame:RegisterEvent("ADDON_LOADED")
+
+for name, pattern in pairs(LA.patterns) do
+  LA.patterns[name] = string.gsub(pattern, "%%s", "(.+)")
+end
+
+function LA:Init()
+  --self:DebugPrint("Initialize()")
+  self:SetDefaultSettings()
+  local version, build, buildDate, tocversion = GetBuildInfo()
+  self.locale = GetLocale()
+  self.tocVersion = tocversion
+
+  -- set up main frame
+  local frame = self.frame
+  frame:Hide()
+  frame:SetClampedToScreen(true)
+  frame:SetWidth(self.frameWidth)
+  frame:SetHeight(self.titleHeight)
+  frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -200, -200)
+  frame:SetMovable(true)
+  frame:SetScript("OnShow", function () self:OnShow() end)
+  frame:SetScript("OnHide", function () self:OnHide() end)
+  frame:SetBackdrop(self.backdrop)
 
   -- create title bar
-  local titleBar = CreateFrame("Frame", "LearningAid_Frame_TitleBar", frame)
+  local titleBar = CreateFrame("Frame", nil, frame)
   self.titleBar = titleBar
   titleBar:SetPoint("TOPLEFT")
   titleBar:SetPoint("TOPRIGHT")
   titleBar:SetHeight(self.titleHeight)
   titleBar:RegisterForDrag("LeftButton")
   titleBar:EnableMouse()
-  titleBar.text = titleBar:CreateFontString("LearningAid_Frame_Title_Text", "OVERLAY", "GameFontNormalLarge")
+  titleBar.text = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   titleBar.text:SetText(self:GetText("title"))
   titleBar.text:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
 
   -- create close button
-  local closeButton = CreateFrame("Button", "LearningAid_Frame_CloseButton", titleBar)
+  local closeButton = CreateFrame("Button", nil, titleBar)
   self.closeButton = closeButton
   closeButton:SetWidth(32)
   closeButton:SetHeight(32)
@@ -179,36 +160,36 @@ function LA:OnInitialize()
   -- set drag and click handlers for the title bar
   titleBar:SetScript(
     "OnDragStart",
-    function (self, button)
-      if not LA.saved.locked then
-        self:GetParent():StartMoving()
+    function (bar, button)
+      if not self.saved.locked then
+        bar:GetParent():StartMoving()
       end
     end
   )
 
   titleBar:SetScript(
     "OnDragStop",
-    function (self)
-      local parent = self:GetParent()
+    function (bar)
+      local parent = bar:GetParent()
       parent:StopMovingOrSizing()
-      LA.saved.x = parent:GetLeft()
-      LA.saved.y = parent:GetTop()
+      self.saved.x = parent:GetLeft()
+      self.saved.y = parent:GetTop()
     end
   )
 
   titleBar:SetScript(
     "OnMouseUp",
-    function (self, button)
+    function (bar, button)
       if button == "MiddleButton" then
-        LA:Hide()
+        self:Hide()
       elseif button == "RightButton" then
-        EasyMenu(LA.menuTable, menu, "cursor", 0, 8, "MENU", LA.menuHideDelay)
+        EasyMenu(self.menuTable, menu, "cursor", 0, 8, "MENU", self.menuHideDelay)
       end
     end
   )
 
   self.options = {
-    handler = LA,
+    handler = self,
     type = "group",
     args = {
       lock = {
@@ -234,29 +215,25 @@ function LA:OnInitialize()
         desc = self:GetText("showLearnSpamHelp"),
         type = "select",
         values = {
-          [LA.FILTER_SHOW_ALL ] = self:GetText("showAll"),
-          [LA.FILTER_SUMMARIZE] = self:GetText("summarize"),
-          [LA.FILTER_SHOW_NONE] = self:GetText("showNone")
+          [self.FILTER_SHOW_ALL ] = self:GetText("showAll"),
+          [self.FILTER_SUMMARIZE] = self:GetText("summarize"),
+          [self.FILTER_SHOW_NONE] = self:GetText("showNone")
         },
         set = function(info, val)
-          self.saved.filterSpam = val
-          if val ~= LA.FILTER_SHOW_ALL then
-            ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
-          else
-            ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
+          local old = self.saved.filterSpam
+          if old ~= val then
+            self.saved.filterSpam = val
+            if val == self.FILTER_SHOW_ALL then
+              self:DebugPrint("Removing chat filter for CHAT_MSG_SYSTEM")
+              ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", private.spellSpamFilter)
+            elseif old == self.FILTER_SHOW_ALL then
+              self:DebugPrint("Adding chat filter for CHAT_MSG_SYSTEM")
+              ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", private.spellSpamFilter)
+            end
           end
         end,
         get = function(info) return self.saved.filterSpam end,
         order = 3
-      },
-      debug = {
-        name = self:GetText("debugOutput"),
-        desc = self:GetText("debugOutputHelp"),
-        type = "toggle",
-        set = function(info, val) self.saved.debug = val end,
-        get = function(info) return self.saved.debug end,
-        width = "full",
-        order = 99
       },
       reset = {
         name = self:GetText("resetPosition"),
@@ -345,11 +322,50 @@ function LA:OnInitialize()
         func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
         guiHidden = true
       },
+      advanced = {
+        type = "group",
+        name = self:GetText("advanced"),
+        args = {
+          framestrata = {
+            name = self:GetText("frameStrata"),
+            desc = self:GetText("frameStrataHelp"),
+            type = "select",
+            values = {
+              -- PARENT = "Parent",
+              BACKGROUND = "Background",
+              LOW = "Low",
+              MEDIUM = "Medium",
+              HIGH = "High",
+              DIALOG = "Dialog",
+              FULLSCREEN = "Fullscreen",
+              FULLSCREEN_DIALOG = "Fullscreen Dialog",
+              TOOLTIP = "Tooltip"
+            },
+            set = function(info, val)
+              self.saved.frameStrata = val
+              self.frame:SetFrameStrata(val)
+            end,
+            get = function(info) return self.frame:GetFrameStrata() end,
+            order = 1
+          },
+          debug = {
+            name = self:GetText("debugOutput"),
+            desc = self:GetText("debugOutputHelp"),
+            values = { SET = "Assignment", GET = "Access", CALL = "Function Calls" },
+            type = "multiselect",
+            set = function(info, key, val) self:Debug(key, val) end,
+            get = function(info, key) return self:Debug(key) end,
+            width = "full",
+            order = 99
+          }
+        }
+      },
       test = {
         type = "group",
         name = "Test",
         desc = "Perform various tests with Learning Aid.",
         hidden = true,
+        guiHidden = true,
         args = {
           add = {
             type = "group",
@@ -380,20 +396,20 @@ function LA:OnInitialize()
                   self:AddButton("CRITTER", tonumber(val))
                 end
               },
-        all = {
-          name = "All",
-    desc = "The Kitchen Sink",
-    type = "execute",
-    func = function ()
-      local i = 1
-      local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-      while spellName do
-        self:AddButton(BOOKTYPE_SPELL, i)
-        i = i + 1
-        spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-      end
-    end
-        }
+              all = {
+                name = "All",
+                desc = "The Kitchen Sink",
+                type = "execute",
+                func = function ()
+                  local i = 1
+                  local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
+                  while spellName do
+                    self:AddButton(BOOKTYPE_SPELL, i)
+                    i = i + 1
+                    spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
+                  end
+                end
+              }
             }
           },
           remove = {
@@ -440,7 +456,7 @@ function LA:OnInitialize()
     }
   }
   self.localClass, self.enClass = UnitClass("player")
-  if GetMultiCastTotemSpells and self.enClass == "SHAMAN" then
+  if self.enClass == "SHAMAN" then
     self.options.args.missing.args.totem = {
       name = self:GetText("findTotem"),
       desc = self:GetText("findTotemHelp"),
@@ -453,7 +469,7 @@ function LA:OnInitialize()
   end
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self:GetText("title").." "..self.version)
-  hooksecurefunc("ConfirmTalentWipe", function() 
+  hooksecurefunc("ConfirmTalentWipe", function()
     self:DebugPrint("ConfirmTalentWipe")
     self:SaveActionBars()
     self.untalenting = true
@@ -483,11 +499,11 @@ function LA:OnInitialize()
   self.LearnTalent = LearnTalent
   self.pendingTalents = {}
   self.pendingTalentCount = 0
-  LearnTalent = function(tab, talent, pet, group)
-    self:DebugPrint("LearnTalent", tab, talent, pet, group)
+  LearnTalent = function(tab, talent, pet, group, ...)
+    self:DebugPrint("LearnTalent", tab, talent, pet, group, ...)
     local name, iconTexture, tier, column, rank, maxRank, isExceptional, meetsPrereq, unknown1, unknown2 = GetTalentInfo(tab, talent, false, pet, group)
     self:DebugPrint("GetTalentInfo", name, iconTexture, tier, column, rank, maxRank, isExceptional, meetsPrereq, unknown1, unknown2)
-    self.LearnTalent(tab, talent, pet, group)
+    self.LearnTalent(tab, talent, pet, group, ...)
     if rank < maxRank and meetsPrereq and not pet then
       --wipe(self.spellsLearned)
       --self.learning = true
@@ -503,8 +519,143 @@ function LA:OnInitialize()
   end
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
-  self:SetEnabledState(self.saved.enabled)
+  --self:SetEnabledState(self.saved.enabled)
+  --self.saved.enabled = true
+  --self:DebugPrint("OnEnable()")
+  local baseEvents = {
+    "ADDON_LOADED",
+    "CHAT_MSG_SYSTEM",
+    "COMPANION_LEARNED",
+    "COMPANION_UPDATE",
+    "PET_TALENT_UPDATE",
+    "PLAYER_LEAVING_WORLD",
+    "PLAYER_LEVEL_UP",
+    "PLAYER_LOGIN",
+    "PLAYER_LOGOUT",
+    "PLAYER_REGEN_DISABLED",
+    "PLAYER_REGEN_ENABLED",
+--    "SPELLS_CHANGED", -- wait until PLAYER_LOGIN
+    "UNIT_SPELLCAST_START",
+    "UPDATE_BINDINGS",
+    "VARIABLES_LOADED"
+--[[
+    "CURRENT_SPELL_CAST_CHANGED",
+    "SPELL_UPDATE_COOLDOWN",
+    "TRADE_SKILL_CLOSE",
+    "TRADE_SKILL_SHOW",
+    "UNIT_SPELLCAST_SUCCEEDED"
+--]]
+  }
+  for i, event in ipairs(baseEvents) do
+    self:RegisterEvent(event, "OnEvent")
+  end
+  
+  --self:UpdateSpellBook()
+  self:UpdateCompanions()
+  self:DiffActionBars()
+  self:SaveActionBars()
+  if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
+    self:DebugPrint("Initially adding chat filter for CHAT_MSG_SYSTEM")
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", private.spellSpamFilter)
+  end
+  if self.saved.locked then
+    self.menuTable[1].text = self:GetText("unlockPosition")
+  else
+    self.saved.locked = false
+  end
+  if self.saved.frameStrata then
+    self.frame:SetFrameStrata(self.saved.frameStrata)
+  end
 end
+
+-- this is a function
+function private.spellSpamFilter(...) return LA:spellSpamFilter(...) end
+
+-- this is a method
+function LA:spellSpamFilter(chatFrame, event, message, ...)
+  local spell
+  local patterns = self.patterns
+  if self.saved.filterSpam ~= self.FILTER_SHOW_ALL and (
+    (
+      self.untalenting or
+      self.retalenting or
+     (self.pendingTalentCount > 0) or
+     (self.saved.filterSpam == self.FILTER_SHOW_NONE) or
+      self.learning or
+      (self.pendingBuyCount > 0)
+    ) and (
+      string.match(message, patterns.learnSpell) or 
+      string.match(message, patterns.learnAbility) or
+      string.match(message, patterns.unlearnSpell) or
+--    )
+--  ) or
+    string.match(message, patterns.petLearnAbility) or
+    string.match(message, patterns.petLearnSpell) or
+    string.match(message, patterns.petUnlearnSpell))
+  ) then
+    self:DebugPrint("Suppressing message")
+    return true -- do not display the message
+  else
+    self:DebugPrint("Allowing message")
+    return false, message, ... -- pass the message along
+  end
+end
+
+function LA:GetText(id, ...)
+  if not id then
+    if self.DebugPrint then
+      self:DebugPrint("Nil supplied to GetText()")
+    end
+    return "Nil"
+  end
+  local result = "Invalid String ID '" .. id .. "'"
+  if self.strings[self.locale] and self.strings[self.locale][id] then
+    result = self.strings[self.locale][id]
+  elseif self.strings.enUS[id] then
+    result = self.strings.enUS[id]
+  else
+    self:DebugPrint(result)
+  end
+  return format(result, ...)
+end
+
+function LA:SetDefaultSettings()
+  LearningAid_Saved = LearningAid_Saved or {}
+  LearningAid_Character = LearningAid_Character or {}
+  self.saved = LearningAid_Saved
+  self.character = LearningAid_Character
+  self.saved.version = self.version
+  self.character.version = self.version
+  for key, value in pairs(self.defaults) do
+    if self.saved[key] == nil then
+      self.saved[key] = value
+    end
+  end
+  -- update with new debug option format as of 1.11
+  if self.saved.debug ~= nil then
+    if self.saved.debug then
+      self.saved.debugFlags = { SET = true, GET = true, CALL = true }
+    end
+    self.saved.debug = nil
+  end
+  for k, v in pairs(self.saved.debugFlags) do
+    if v then
+      self:Debug()
+      break
+    end
+  end
+end
+
+function LA:RegisterEvent(event)
+  self.frame:RegisterEvent(event)
+--  self.events[event] = true -- EVENT DEBUGGING
+end
+
+function LA:UnregisterEvent(event)
+  self.frame:UnregisterEvent(event)
+--  self.events[event] = false -- EVENT DEBUGGING
+end
+
 function LA:Ignore(info, str)
   local strLower = string.lower(str)
   if #strtrim(str) == 0 and self.saved.ignore[self.localClass] then
@@ -559,58 +710,16 @@ end
 function LA:AceSlashCommand(msg)
   LibStub("AceConfigCmd-3.0").HandleCommand(LearningAid, "la", "LearningAidConfig", msg)
 end
+--[[
 function LA:OnEvent(event, ...)
-  self:DebugPrint(event, ...)
+  --self:DebugPrint(event, ...)
   if self[event] then
     self[event](self, ...)
   end
 end
-function LA:OnEnable()
-  self.saved.enabled = true
-  self:DebugPrint("OnEnable()")
-  local events = {
-    "ADDON_LOADED",
-    "CHAT_MSG_SYSTEM",
-    "COMPANION_LEARNED",
-    "COMPANION_UPDATE",
-    "PET_TALENT_UPDATE",
-    "PLAYER_LEAVING_WORLD",
-    "PLAYER_LEVEL_UP",
-    "PLAYER_LOGOUT",
-    "PLAYER_REGEN_DISABLED",
-    "PLAYER_REGEN_ENABLED",
-    "SPELLS_CHANGED",
-    "UNIT_SPELLCAST_START",
-    "UPDATE_BINDINGS",
-    "VARIABLES_LOADED"
+]]
 --[[
-    "CURRENT_SPELL_CAST_CHANGED",
-    "SPELL_UPDATE_COOLDOWN",
-    "TRADE_SKILL_CLOSE",
-    "TRADE_SKILL_SHOW",
-    "UNIT_SPELLCAST_SUCCEEDED"
---]]
-  }
-  for i, event in ipairs(events) do
-    self:RegisterEvent(event, "OnEvent")
-  end
-  
-  self:UpdateSpellBook()
-  self:UpdateCompanions()
-  self:DiffActionBars()
-  self:SaveActionBars()
-  if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
-    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
-  end
-  if self.saved.locked then
-    self.menuTable[1].text = self:GetText("unlockPosition")
-  else
-    self.saved.locked = false
-  end
-  if self.saved.x and self.saved.y then
-    self.frame:ClearAllPoints()
-    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
-  end
+function LA:OnEnable()
 end
 function LA:OnDisable()
   self:Hide()
@@ -619,12 +728,14 @@ function LA:OnDisable()
     ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", spellSpamFilter)
   end
 end
-
-local function unRankSpell(str)
+]]
+--[[
+function LA:UnRankSpell(str)
   local rank = tonumber(string.match(str, "%(%D*(%d+)%D*%)"))
   local spell = strtrim(string.match(str, "^([^%(]+)"))
   return spell, rank
 end
+--]]
 --[[ FormatSpells(t)
   t = {
     { key = "spell used as sort key", value = <spell link or spell name and rank, doesn't matter> },
@@ -632,7 +743,9 @@ end
     { etc}
   }
 --]]
-local function formatSpells(t)
+function LA:FormatSpells(t)
+--  LoadAddOn("Blizzard_DebugTools")
+--  DevTools_Dump(t)
   if #t > 0 then
     table.sort(t, function(a, b) return a.key < b.key end)
     local str = ""
@@ -644,282 +757,12 @@ local function formatSpells(t)
     return str
   end
 end
-local systemInfo = ChatTypeInfo["SYSTEM"]
-local function systemPrint(message)
+
+function LA:SystemPrint(message)
+  local systemInfo = ChatTypeInfo["SYSTEM"]
   DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
 end
-function LA:ADDON_LOADED(addOn)
-  if addOn == "Blizzard_TrainerUI" then
-    self:CreateTrainAllButton()
-    self:UnregisterEvent("ADDON_LOADED")
-  end
-end
-function LA:ACTIONBAR_SLOT_CHANGED(slot)
--- actionbar1 = ["spell" 2354] ["macro" 5] [nil]
--- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
--- self.character.actions[spec][1][2354] = true
-  
-  if self.untalenting then
-    -- something something on (slot)
-    local spec = GetActiveTalentGroup()
-    local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
-    local oldID = self.character.actions[spec][slot]
-    self:DebugPrint("Action Slot "..slot.." changed:",
-      (actionType or "")..",",
-      (actionID or "")..",",
-      (actionSubType or "")..",",
-      (globalID or "")..",",
-      (oldID or "")
-    )
-    if oldID and (actionType ~= BOOKTYPE_SPELL or globalID ~= oldID) then
-      if not self.character.unlearned then self.character.unlearned = {} end
-      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
-      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
-      self.character.unlearned[spec][slot][oldID] = true
-    end
-  end
-end
-function LA:CHAT_MSG_SYSTEM(message)
-  -- note: pet spells, when learned, do not come as links
-  -- player spells do come as links
-  local rank
-  local spell
-  local t
-  local str = string.match(message, self.patterns.learnSpell) or string.match(message, self.patterns.learnAbility)
-  if str then
-    t = self.spellsLearned
-  else
-    str = string.match(message, self.patterns.unlearnSpell) 
-    if str then
-      t = self.spellsUnlearned
-    end
-  end
-  if t then
-    local name, globalID = self:UnLinkSpell(str)
-    self:DebugPrint("Matched "..name.." "..globalID)
-    table.insert(t, { key = name, value = str })
-  else
-    str = string.match(message, self.patterns.petLearnAbility) or string.match(message, self.patterns.petLearnSpell)
-    if str then
-      t = self.petLearned
-    else
-      str = string.match(message, self.patterns.petUnlearnSpell)
-      if str then
-        t = self.petUnlearned
-      end
-    end
-    if t then
-      --spell, rank = unRankSpell(str)
-      table.insert(t, { key = str, value = str })
-    end
-  end
-end
-function LA:COMPANION_LEARNED()
-  self:DiffCompanions()
-end
-function LA:COMPANION_UPDATE()
-  if self.companionsReady then
-    local frame = self.frame
-    local buttons = self.buttons
-    for i = 1, self:GetVisible() do
-      local button = buttons[i]
-      local kind = button.kind
-      if kind == "MOUNT" or kind == "CRITTER" then
-        local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, button:GetID())
-        if isSummoned then
-          button:SetChecked(true)
-        else
-          button:SetChecked(false)
-        end
-      end
-    end
-  else
-    self:UpdateCompanions()
-  end
-end
-function LA:CURRENT_SPELL_CAST_CHANGED()
-  local frame = self.frame
-  local buttons = self.buttons
-  for i = 1, self:GetVisible() do
-    local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      self:SpellButton_UpdateSelection(button)
-    end
-  end
-end
-function LA:PET_TALENT_UPDATE()
-  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-    local petLearned = formatSpells(self.petLearned)
-    local petUnlearned = formatSpells(self.petUnlearned)
-    if petUnlearned then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
-    if petLearned then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-  end
-  wipe(self.petLearned)
-  wipe(self.petUnlearned)
-end
-function LA:PLAYER_ENTERING_WORLD()
-  self:RegisterEvent("SPELLS_CHANGED", "OnEvent")
-end
-function LA:PLAYER_LEAVING_WORLD()
-  self:UnregisterEvent("SPELLS_CHANGED", "OnEvent")
-  self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnEvent")
-end
-function LA:PLAYER_LEVEL_UP()
-  if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-    local petLearned = formatSpells(self.petLearned)
-    local petUnlearned = formatSpells(self.petUnlearned)
-    if petUnlearned then systemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
-    if petLearned then systemPrint(self:GetText("yourPetHasLearned", petLearned)) end
-  end
-  wipe(self.petLearned)
-  wipe(self.petUnlearned)
-end
-function LA:PLAYER_LOGOUT()
-  self:SaveActionBars()
-end
-function LA:PLAYER_REGEN_DISABLED()
-  self.inCombat = true
-  self.closeButton:Disable()
-end
-function LA:PLAYER_REGEN_ENABLED()
-  self.inCombat = false
-  self.closeButton:Enable()
-  self:ProcessQueue()
-end
-function LA:PLAYER_TALENT_UPDATE()
-  if self.untalenting then
-    self.untalenting = false
-    self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
-    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-    self:UnregisterEvent("UI_ERROR_MESSAGE")
-    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-      local unlearned = formatSpells(self.spellsUnlearned)
-      if unlearned then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
-    end
-    wipe(self.spellsUnlearned)
-  elseif self.pendingTalentCount > 0 then --self.learning then
-    self.pendingTalentCount = self.pendingTalentCount - 1
-    if self.pendingTalentCount <= 0 then
-      --self.learning = false
-      if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-        local learned = formatSpells(self.spellsLearned)
-        if learned then systemPrint(self:GetText("youHaveLearned", learned)) end
-      end
-      self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-      wipe(self.pendingTalents)
-      wipe(self.spellsLearned)
-    end
-  elseif self.learning then
-    self.learning = false
-    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-      local learned = formatSpells(self.spellsLearned)
-      if learned then systemPrint(self:GetText("youHaveLearned", learned)) end
-    end
-    wipe(self.spellsLearned)
-  end
-end
-function LA:SPELLS_CHANGED()
-  if not self.companionsReady then
-    self:UpdateCompanions()
-  end
-  if self.spellBookCache ~= nil and not self:DiffSpellBook() then
-    self:DebugPrint("Event SPELLS_CHANGED fired without spell changes")
-  end
-end
-function LA:SPELL_UPDATE_COOLDOWN()
-  local frame = self.frame
-  local buttons = self.buttons
-  for i = 1, self:GetVisible() do
-    local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      self:UpdateButton(button)
-    elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
-      local start, duration, enable = GetCompanionCooldown(button.kind, button:GetID())
-      CooldownFrame_SetTimer(button.cooldown, start, duration, enable);
-    end
-  end
-end
-function LA:TRADE_SKILL_SHOW()
-  local frame = self.frame
-  local buttons = self.buttons
-  for i = 1, self:GetVisible() do
-    local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      if IsSelectedSpellBookItem(button:GetID(), button.kind) then
-        button:SetChecked(true)
-      else
-        button:SetChecked(false)
-      end
-    end
-  end
-end
-LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
-function LA:UNIT_SPELLCAST_START(unit, spellName, deprecated, counter, globalID)
-  if unit == "player" and (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) then
-    self:DebugPrint("Talent swap initiated")
-    self.retalenting = true
-    wipe(self.spellsLearned)
-    wipe(self.spellsUnlearned)
-    --self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
-    self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
-    self:RegisterEvent("UNIT_SPELLCAST_STOP", "OnEvent")
-    self:RegisterEvent("UNIT_SPELLCAST_FAILED_QUIET", "OnEvent")
-  end
-end
-function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spellName, deprecated, counter, globalID)
-  if unit == "player" and (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) then
-    self:DebugPrint("Talent swap canceled")
-    self.retalenting = false
-    self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    self:UnregisterEvent("UNIT_SPELLCAST_STOP")
-    self:UnregisterEvent("UNIT_SPELLCAST_FAILED_QUIET")
-  end
-end
-LA.UNIT_SPELLCAST_FAILED_QUIET = LA.UNIT_SPELLCAST_INTERRUPTED
-function LA:UNIT_SPELLCAST_STOP(unit, spellName, deprecated, counter, globalID)
-  if unit == "player" and (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) then
-    self:DebugPrint("Talent swap completed")
-    self.retalenting = false
-    self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    self:UnregisterEvent("UNIT_SPELLCAST_STOP")
-    self:UnregisterEvent("UNIT_SPELLCAST_FAILED_QUIET")
-    if self.saved.filterSpam == LA.FILTER_SUMMARIZE then
-      -- don't print spells that are unlearned then immediately relearned
-      for spell, rank in pairs(self.spellsLearned) do
-        if self.spellsUnlearned[spell] then
-          self.spellsLearned[spell] = nil
-          self.spellsUnlearned[spell] = nil
-        end
-      end
-      local learned = formatSpells(self.spellsLearned)
-      local unlearned = formatSpells(self.spellsUnlearned)
-      if unlearned then systemPrint(self:GetText("youHaveUnlearned", unlearned)) end
-      if learned then systemPrint(self:GetText("youHaveLearned", learned)) end
-    end
-    wipe(self.spellsLearned)
-    wipe(self.spellsUnlearned)
-  end
-end
-function LA:UI_ERROR_MESSAGE()
-  if self.untalenting then
-    self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
-    self:UnregisterEvent("UI_ERROR_MESSAGE")
-    self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-    self.untalenting = false
-  end
-end
-function LA:UPDATE_BINDINGS()
-  if self.companionsReady or self:UpdateCompanions() then
-    self:UnregisterEvent("UPDATE_BINDINGS")
-  end
-end
-function LA:VARIABLES_LOADED()
-  if self.saved.x and self.saved.y then
-    self.frame:ClearAllPoints()
-    self.frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self.saved.x, self.saved.y)
-  end
-end
+
 function LA:ProcessQueue()
   if self.inCombat then
     self:DebugPrint("ProcessQueue(): Cannot process action queue during combat.")
@@ -954,6 +797,29 @@ function LA:ProcessQueue()
   end
   self.queue = {}
 end
+
+function LA:PrintPending()
+  if self.saved.filterSpam == self.FILTER_SUMMARIZE then
+    local learned = self:FormatSpells(self.spellsLearned)
+    local unlearned = self:FormatSpells(self.spellsUnlearned)
+    if unlearned then self:SystemPrint(self:GetText("youHaveUnlearned", unlearned)) end
+    if learned then self:SystemPrint(self:GetText("youHaveLearned", learned)) end
+
+    table.sort(self.petLearned)
+    table.sort(self.petUnlearned)
+
+    local petLearned = self:ListJoin(self.petLearned)
+    local petUnlearned = self:ListJoin(self.petUnlearned)
+    if petUnlearned then self:SystemPrint(self:GetText("yourPetHasUnlearned", petUnlearned)) end
+    if petLearned then self:SystemPrint(self:GetText("yourPetHasLearned", petLearned)) end
+  end
+  wipe(self.petLearned)
+  wipe(self.petUnlearned)
+  wipe(self.spellsLearned)
+  wipe(self.spellsUnlearned)
+  wipe(self.pendingTalents)
+end
+
 function LA:CreateButton()
   local frame = self.frame
   local buttons = self.buttons
@@ -1223,17 +1089,127 @@ function LA:TestRemove(kind, ...)
     end
   end
 end
+
+--[[
 function LA:DebugPrint(...)
   if self.saved and self.saved.debug and self.saved.enabled then
-    local argc = select("#", ...)
-    local str = self:GetText("title")..": "..tostring(select(1, ...))
-    for i = 2, argc do
-      str = str..", "..tostring(select(i, ...))
-    end
-    str = str.."."
-    print(str)
+    private:DebugPrint(...)
   end
 end
+--]]
+
+function LA:ListJoin(...)
+  local str = ""
+  local argc = select("#", ...)
+  if argc == 1 and type(...) == "table" then
+    self:ListJoin(unpack(...))
+  elseif argc >= 1 then
+    str = str..tostring((...))
+    for i = 2, argc do
+      str = str..", "..tostring((select(i, ...)))
+    end
+  end
+  return str
+end
+
+function private:DebugPrint(...)
+  private.debugCount = private.debugCount + 1
+  LearningAid_DebugLog[private.debugCount] = LA:ListJoin(...)
+  if private.debugCount > 5000 then
+    LearningAid_DebugLog[private.debugCount - 5000] = nil
+  end
+end
+-- don't call the stub DebugPrint, call the real DebugPrint
+private.wrappers.DebugPrint = private.DebugPrint
+
+private.meta = {
+  __index = function(t, key)
+    local value = private.shadow[key]
+    if type(value) == "function" then
+      if private.debugFlags.CALL and not private.noLog[key] then
+        return private:Wrap(key, value)
+      else
+        return value
+      end
+    elseif private.debugFlags.GET then
+      private:DebugPrint("__index["..tostring(key).."] = "..tostring(value))
+    end
+    return value
+  end,
+  __newindex = function(t, key, value)
+    if private.debugFlags.SET then
+      private:DebugPrint("__newindex["..tostring(key).."] = "..tostring(value))
+    end
+    private.shadow[key] = value
+  end
+}
+-- when debugging is enabled, calls to LA:DebugPrint will be shunted to private:DebugPrint
+function LA:DebugPrint() end
+
+--setmetatable(private.empty, private.meta)
+
+-- call after original LA is in private.LA and LA is empty
+function private:Wrap(name, f)
+  if not self.wrappers[name] then
+    self.wrappers[name] = function(...)
+      self:DebugPrint(name.."("..LA:ListJoin(select(2,...))..")")
+      local result = { f(...) } -- junk table created, boo hoo
+      self:DebugPrint(name.."() return "..LA:ListJoin(unpack(result)))
+      return unpack(result)
+    end
+  end
+  return self.wrappers[name]
+end
+
+function LA:Debug(flag, newValue)
+  local oldDebug = private.debug
+  local newDebug = oldDebug
+  local debugFlags = private.debugFlags
+  local oldValue = debugFlags[flag]
+  --newValue = (newValue and true or false) -- boolean-ify
+  if flag == nil then -- initialize
+    newDebug = 0
+    for savedFlag, savedValue in pairs(self.saved.debugFlags) do
+      debugFlags[savedFlag] = savedValue
+      if savedValue then
+        newDebug = newDebug + 1
+      end
+    end
+  elseif newValue == nil then
+    return oldValue
+  elseif newValue ~= oldValue then
+    debugFlags[flag] = newValue
+    newDebug = newDebug + (newValue and 1 or -1)
+  end
+  local shadow = private.shadow
+  if oldDebug == 0 and newDebug > 0 then -- we're turning debugging on
+--    LA.frame:SetScript("OnEvent", private.onEventDebug)
+--    LA.frame:RegisterAllEvents()
+    for k, v in pairs(LA) do
+      shadow[k] = LA[k]
+      LA[k] = nil
+    end
+    setmetatable(LA, private.meta)
+    LearningAid_DebugLog = { }
+  elseif oldDebug > 0 and newDebug == 0 then -- we're turning debugging off
+    setmetatable(LA, nil)
+    for k, v in pairs(shadow) do
+      LA[k] = shadow[k]
+      shadow[k] = nil
+    end
+--[[
+    LA.frame:SetScript("OnEvent", private.onEvent)
+    LA.frame:UnregisterAllEvents()
+    for event, bool in pairs(LA.events) do
+      if bool then
+        LA.frame:RegisterEvent(event)
+      end
+    end
+]]
+  end
+  private.debug = newDebug
+end
+
 function LA:OnShow()
   self:RegisterEvent("COMPANION_UPDATE", "OnEvent")
   self:RegisterEvent("TRADE_SKILL_SHOW", "OnEvent")

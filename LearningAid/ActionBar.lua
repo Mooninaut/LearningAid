@@ -1,4 +1,8 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+-- ActionBar.lua
+
+local addonName, private = ...
+local LA = private.LA
+
 LA.castSlashCommands = {
   [SLASH_USE1] = true,
   [SLASH_USE2] = true,

@@ -1,4 +1,7 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+-- Spell.lua
+
+local addonName, private = ...
+local LA = private.LA
 
 -- Transforms a spellbook ID into a global spell ID
 function LA:GlobalSpellID(id)
@@ -15,8 +18,8 @@ function LA:UnLinkSpell(link)
   return name, tonumber(globalID)
 end
 function LA:UpdateSpellBook()
-  self.spellBookCache = {}
-  self.flyoutCache = {}
+  wipe(self.spellBookCache)
+  wipe(self.flyoutCache)
   local numKnown = 0
   local i = 1
   -- CATA -- local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
@@ -59,6 +62,7 @@ function LA:UpdateSpellBook()
   self:DebugPrint("Updated Spellbook, "..i.." spells found, "..numKnown.." spells known.")
   self.numSpells = i
 end
+
 function LA:AddSpell(id, new)
   local action = "SHOW"
   if new then
@@ -76,6 +80,7 @@ function LA:AddSpell(id, new)
     end
   end
 end
+
 function LA:RemoveSpell(id)
   if self.inCombat then
     table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL })
@@ -84,6 +89,7 @@ function LA:RemoveSpell(id)
     self:ForgetSpell(id)
   end
 end
+
 function LA:DiffSpellBook()
   local cache = self.spellBookCache
   local flyout = self.flyoutCache
@@ -108,8 +114,10 @@ function LA:DiffSpellBook()
       local flyoutName, flyoutDescription, numFlyoutSpells, known = GetFlyoutInfo(spellGlobalID)
       old = flyout[spellGlobalID]
       if old == nil then
-        table.insert(flyoutChanges, {kind="NEW", spellBookID = i, flyoutID = spellGlobalID, name = flyoutName})
         updated = updated + 1
+        if known then 
+          table.insert(flyoutChanges, {kind="NEW", spellBookID = i, flyoutID = spellGlobalID, name = flyoutName})
+        end
       else
         old.fresh = true
         if old.known ~= known then
@@ -118,19 +126,20 @@ function LA:DiffSpellBook()
         end
       end
     else
+      local known = IsSpellKnown(spellGlobalID)
       old = cache[spellGlobalID]
       if old == nil then
         updated = updated + 1
-        table.insert(changes, {kind="NEW", spellBookID = i, globalID = spellGlobalID, name = spellName})
+        if known then
+          table.insert(changes, {kind="NEW", spellBookID = i, globalID = spellGlobalID, name = spellName})
+        end
       else
         old.fresh = true
-        local known = IsSpellKnown(spellGlobalID)
         if old.known ~= known then
           updated = updated + 1
           table.insert(changes, {kind="CHANGE", spellBookID = i, globalID = spellGlobalID, name = spellName})
-          self:DebugPrint("SOMETHING CHANGED IN THE MATRIX")
-          self:DebugPrint("OLD: "..old.name.." "..old.status.." "..old.globalID.." "..old.spellBookID.." "..tostring(old.known))
-          self:DebugPrint("NEW: "..spellName.." "..spellStatus.." "..spellGlobalID.." "..i.." "..tostring(known))
+          self:DebugPrint("OLD: name "..old.name.." status "..old.status.." global "..old.globalID.." bookid "..old.spellBookID.." known "..tostring(old.known))
+          self:DebugPrint("NEW: name "..spellName.." status "..spellStatus.." global "..spellGlobalID.." bookid "..i.." known "..tostring(known))
         end
       end
     end
@@ -153,7 +162,7 @@ function LA:DiffSpellBook()
   if updated > 0 then
     self:UpdateSpellBook()
     for k, v in ipairs(changes) do
-      self:DebugPrint("Spell "..v.spellBookID.." "..v.kind.." "..k.." "..v.globalID.." "..v.name)
+      self:DebugPrint("Spell name "..v.name.." change "..v.kind.." global "..v.globalID.." bookid "..v.spellBookID)
       --self:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].subName..") id "..(i))
       if v.kind == "REMOVE" then
         self:RemoveSpell(v.spellBookID)

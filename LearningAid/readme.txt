@@ -2,9 +2,6 @@ Learning Aid version 1.11
 Written by Jamash (Kil'jaeden US)
 Email: mooninaut@gmail.com
 
-If you would like to contribute to the development of Learning Aid, please
-visit http://pledgie.com/campaigns/3581
-
 To download the latest version of Learning Aid, please visit either
 http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx
 or

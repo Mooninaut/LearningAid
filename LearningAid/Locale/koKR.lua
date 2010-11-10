@@ -1,4 +1,5 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+local addonName, private = ...
+local LA = private.LA
 LA.strings.koKR = {
 	close = "창 닫기",
 	configure = "설정",

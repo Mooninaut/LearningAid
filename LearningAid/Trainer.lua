@@ -1,9 +1,13 @@
-local LA = LibStub("AceAddon-3.0"):GetAddon("LearningAid",true)
+-- Trainer.lua
+
+local addonName, private = ...
+local LA = private.LA
+
 function LA:CreateTrainAllButton()
   if not self.trainAllButton then
     local button = CreateFrame("Button", "LearningAid_TrainAllButton", ClassTrainerTrainButton, "MagicButtonTemplate")
     button:SetPoint("RIGHT", ClassTrainerTrainButton, "LEFT")
-    button:SetText("Train All")
+    button:SetText(self:GetText("trainAllButton"))
     button:SetScript("OnClick", function() StaticPopup_Show("LEARNING_AID_TRAINER_BUY_ALL") end)
     button:SetScript("OnShow", function(thisButton) 
       local services = LA:GetAvailableTrainerServices()
@@ -73,13 +77,20 @@ end
 function LA:BuyAllTrainerServices(really)
   local services = self.availableServices
   if services and really == LA.CONFIRM_TRAINER_BUY_ALL then
-    self:DebugPrint("Buying all "..#services.." service(s) for "..services.cost.." copper")
+    self.pendingBuyCount = #services
+    self:DebugPrint("Buying all "..self.pendingBuyCount.." service(s) for "..services.cost.." copper")
     for i, t in ipairs(services) do
       --if t.category == "available" then
         BuyTrainerService(t.index)
       --end
     end
+    --[[
     wipe(services)
+    self.learning = false
+    local learned = self:FormatSpells(self.spellsLearned)
+    if learned then self:SystemPrint(self:GetText("youHaveLearned", learned)) end
+    wipe (self.spellsLearned)
+    --]]
   end
 end
 

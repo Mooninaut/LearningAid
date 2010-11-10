@@ -14,6 +14,7 @@ embeds.xml
 
 LearningAid.xml
 LearningAid.lua
+Events.lua
 SpellButton.lua
 Companion.lua
 Spell.lua
