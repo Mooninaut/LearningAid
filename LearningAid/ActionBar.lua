@@ -118,12 +118,14 @@ function LA:FindMissingActions()
   local numTrackingTypes = GetNumTrackingTypes()
   local localClass, enClass = UnitClass("player")
   local ignore
-  local cache = self.spellBookCache
+  local bookCache = self.spellBookCache
+  local infoCache = self.spellInfoCache
   if self.saved.ignore[localClass] then
     ignore = self.saved.ignore[localClass]
   else
     ignore = {}
   end
+  --[[
   if not self.saved.tracking then
     for trackingType = 1, numTrackingTypes do
       local name, texture, active, category = GetTrackingInfo(trackingType)
@@ -132,7 +134,8 @@ function LA:FindMissingActions()
       end
     end
   end
-  if (not self.saved.totem) and enClass == "SHAMAN" and GetMultiCastTotemSpells then
+  ]]
+  if (not self.saved.totem) and enClass == "SHAMAN" then
     self:DebugPrint("Searching for totems")
     for totemType = 1, MAX_TOTEMS do
       local totemSpells = {GetMultiCastTotemSpells(totemType)}
@@ -210,14 +213,14 @@ function LA:FindMissingActions()
       shapeshift[globalID] = true
     end
   end
-  for globalID, info in pairs(cache) do
-    local spellName = info.name
+  for globalID, spell in pairs(bookCache) do
+    local spellName = spell.info.name
     spellNameLower = string.lower(spellName)
-    if info.known and
+    if spell.known and
       (not actions[globalID]) and -- spell is not on any action bar
-      (not IsPassiveSpell(info.spellBookID, BOOKTYPE_SPELL)) and -- spell is not passive
+      (not spell.info.passive) and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
-      (not tracking[spellName]) and
+      --(not tracking[spellName]) and
       (not shapeshift[globalID]) and
       (not totem[globalID]) and
       (not macroSpells[spellNameLower]) and
@@ -225,16 +228,16 @@ function LA:FindMissingActions()
       (not ignore[spellNameLower])
     then
       -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      self:DebugPrint("Spell "..info.name.." is not on any action bar.")
+      self:DebugPrint("Spell "..spellName.." is not on any action bar.")
       --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
-      table.insert(results, info)
-    elseif info.status == "FLYOUT" and
-      not flyouts[globalID] then
+      table.insert(results, spell)
+    elseif spell.status == "FLYOUT" and not flyouts[globalID] then
+      -- ?
     end
   end
-  table.sort(results, function (a, b) return a.spellBookID < b.spellBookID end)
+  table.sort(results, function (a, b) return a.bookID < b.bookID end)
   for result = 1, #results do
-    self:AddButton(BOOKTYPE_SPELL, results[result].spellBookID)
+    self:AddButton(BOOKTYPE_SPELL, results[result].bookID)
   end
 end
 
@@ -248,16 +251,11 @@ function LA:RestoreAction(globalID)
         --local actionType, actionID, actionSubType, slotGlobalID = GetActionInfo(actionSlot)
         local actionType = GetActionInfo(actionSlot)
         if actionType == nil then
-          local spellBookID
-          for index, info in ipairs(self.spellBookCache) do
-            if info.globalID == globalID then
-              spellBookID = info.spellBookID
-              self:DebugPrint("RestoreAction("..globalID.."): Found action at Spellbook ID "..spellBookID)
-              break
-            end
-          end
-          if spellBookID then
-            PickupSpell(spellBookID, BOOKTYPE_SPELL)
+          local bookID
+          if self.spellBookCache[globalID] then
+            bookID = self.spellBookCache[globalID].bookID
+            self:DebugPrint("RestoreAction("..globalID.."): Found action at Spellbook ID "..bookID)
+            PickupSpell(bookID, BOOKTYPE_SPELL)
             PlaceAction(actionSlot)
           end
         end

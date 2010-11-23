@@ -3,6 +3,228 @@
 local addonName, private = ...
 local LA = private.LA
 
+function LA:CreateButton()
+  local buttons = self.buttons
+  local count = #buttons
+  -- button global variable names start with "SpellButton" to work around an
+  -- issue with the Blizzard Feedback Tool used in beta and on the PTR
+  local name = "SpellButton_LearningAid_"..(count + 1)
+  local button = CreateFrame("CheckButton", name, self.frame, "LearningAidSpellButtonTemplate")
+  local background = _G[name.."Background"]
+  background:Hide()
+  local subSpellName = _G[name.."SubSpellName"]
+  subSpellName:SetTextColor(NORMAL_FONT_COLOR.r - 0.1, NORMAL_FONT_COLOR.g - 0.1, NORMAL_FONT_COLOR.b - 0.1)
+  buttons[count + 1] = button
+  button.index = count + 1
+  button:SetAttribute("type*", "spell")
+  button:SetAttribute("type3", "hideButton")
+  button:SetAttribute("alt-type*", "hideButton")
+  button:SetAttribute("shift-type1", "linkSpell")
+  button:SetAttribute("ctrl-type*", "toggleIgnore")
+  button.hideButton = function(spellButton, mouseButton, down)
+    if not self.inCombat then
+      self:ClearButtonIndex(spellButton.index)
+    end
+  end
+  button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
+  button.toggleIgnore = function(spellButton, mouseButton, down)
+    if spellButton.kind == BOOKTYPE_SPELL then
+      self:ToggleIgnore(spellButton.spellName:GetText())
+      self:UpdateButton(spellButton)
+    end
+  end
+  button.iconTexture = _G[name.."IconTexture"]
+  button.cooldown = _G[name.."Cooldown"]
+  button.spellName = _G[name.."SpellName"]
+  button.subSpellName = _G[name.."SubSpellName"]
+  return button
+end
+function LA:AddButton(kind, id)
+  if kind == BOOKTYPE_SPELL then
+    if id > self.numSpells or id < 1 then
+      self:DebugPrint("AddButton(): Invalid spell ID", id)
+      return
+    end
+  elseif kind == "MOUNT" or kind == "CRITTER" then
+    if id < 1 or id > GetNumCompanions(kind) then
+      self:DebugPrint("AddButton(): Invalid companion, type", kind, "ID", id)
+      return
+    end
+  end
+  local buttons = self.buttons
+  local visible = self:GetVisible()
+  for i = 1, visible do
+    if buttons[i].kind == kind and buttons[i]:GetID() == id then
+      return
+    end
+  end
+  local button
+  -- if bar is full
+  if visible == #buttons then
+    button = self:CreateButton()
+    self:DebugPrint("Adding button id "..id.." index "..button.index)
+  else
+  -- if bar has free buttons
+    button = buttons[self:GetVisible() + 1]
+    self:DebugPrint("Changing button index "..(self:GetVisible() + 1).." from id "..button:GetID().." to "..id)
+    button:Show()
+  end
+
+  button.kind = kind
+  self:SetVisible(visible + 1)
+  button:SetID(id)
+  button:SetChecked(false)
+  
+  if kind == BOOKTYPE_SPELL then
+    -- if id > 1 then
+    --   local name, subName = GetSpellBookItemName(id, kind)
+    --   local prevName, prevSubName = GetSpellBookItemName(id - 1, kind)
+      -- CATA -- if name == prevName then
+      --   self:DebugPrint("Found new rank of existing ability "..name.." "..prevRank)
+      --   self:ClearButtonID(kind, id - 1)
+      -- else
+      --   self:DebugPrint(name.." ~= "..prevName)
+      -- end
+    -- end
+    if IsSelectedSpellBookItem(id, kind) then
+      button:SetChecked(true)
+    end
+  elseif kind == "MOUNT" or kind == "CRITTER" then
+    -- button.Companion = name
+    local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, id)
+    if isSummoned then
+      button:SetChecked(true)
+    end
+  else
+    self:DebugPrint("AddButton(): Invalid button type "..kind)
+  end
+  self:UpdateButton(button)
+  self:AutoSetMaxHeight()
+  self.frame:Show()
+end
+function LA:ClearButtonID(kind, id)
+  local buttons = self.buttons
+  local i = 1
+  -- not using a for loop because self.visible may change during the loop execution
+  while i <= self:GetVisible() do
+    if buttons[i].kind == kind and buttons[i]:GetID() == id then
+      self:DebugPrint("Clearing button "..i.." with ID "..buttons[i]:GetID())
+      self:ClearButtonIndex(i)
+    else
+      --self:DebugPrint("Button "..i.." has id "..buttons[i]:GetID().." which does not match "..id)
+      i = i + 1
+    end
+  end
+end
+function LA:SetMaxHeight(newMaxHeight) -- in buttons, not pixels
+  self.maxHeight = newMaxHeight
+  self:ReshapeFrame()
+end
+function LA:GetMaxHeight()
+  return self.maxHeight
+end
+function LA:AutoSetMaxHeight()
+  local screenHeight = UIParent:GetHeight()
+  self:DebugPrint("Screen Height = ".. screenHeight)
+  local newMaxHeight = math.floor((UIParent:GetHeight()-self.titleHeight)/(self.buttonSize+self.verticalSpacing) - 3)
+  self:DebugPrint("Setting MaxHeight to " .. newMaxHeight)
+  self:SetMaxHeight(newMaxHeight)
+  return newMaxHeight
+end
+function LA:ReshapeFrame()
+  local newHeight
+  local newWidth
+  local maxHeight = self.maxHeight
+  local visible = self:GetVisible()
+  if visible > maxHeight then
+    newHeight = maxHeight
+    newWidth = math.ceil(visible / maxHeight)
+  else
+    newHeight = visible
+    newWidth = 1
+  end
+  local frame = self.frame
+  frame:SetHeight(self.titleHeight + self.framePadding + (self.buttonSize + self.verticalSpacing) * newHeight)
+  frame:SetWidth(self.framePadding + (self.buttonSize + self.horizontalSpacing) * newWidth)
+  self.height = newHeight
+  self.width = newWidth
+  self:ParentButtons()
+end
+function LA:ParentButtons()
+  local buttons = self.buttons
+  local visible = self:GetVisible()
+  if visible >= 1 then
+    buttons[1]:SetPoint("TOPLEFT", self.titleBar, "BOTTOMLEFT", 16, 0)
+  end
+  for i = 2, visible do
+    if i <= self.height then
+      buttons[i]:SetPoint("TOPLEFT", buttons[i-1], "BOTTOMLEFT", 0, -self.verticalSpacing)
+    else
+      buttons[i]:SetPoint("TOPLEFT", buttons[i-self.height], "TOPRIGHT", self.horizontalSpacing, 0)
+    end
+  end
+end
+function LA:ClearButtonIndex(index)
+-- I have buttons 1 2 3 (4 5)
+-- I remove button 2
+-- I want 1 3 (3 4 5)
+-- before, visible = 3
+-- after, visible = 2
+  local frame = self.frame
+  local buttons = self.buttons
+  local visible = self:GetVisible()
+  for i = index, visible - 1 do
+    local button = buttons[i]
+    local nextButton = buttons[i + 1]
+    button:SetID(nextButton:GetID())
+    button:SetChecked(nextButton:GetChecked())
+    button.kind = nextButton.kind
+    button.iconTexture:SetVertexColor(nextButton.iconTexture:GetVertexColor())
+    local cooldown = button.cooldown
+    local nextCooldown = nextButton.cooldown
+    cooldown.start = nextCooldown.start
+    cooldown.duration = nextCooldown.duration
+    cooldown.enable = nextCooldown.enable
+    if cooldown.start and cooldown.duration and cooldown.enable then 
+      CooldownFrame_SetTimer(cooldown, cooldown.start, cooldown.duration, cooldown.enable)
+    else
+      cooldown:Hide()
+    end
+    --if buttons[i]:IsShown() then
+    self:UpdateButton(button)
+    --end
+  end
+  buttons[visible]:Hide()
+  self:SetVisible(visible - 1)
+  self:ReshapeFrame()
+end
+function LA:SetVisible(visible)
+  local frame = self.frame
+  self.visible = visible
+  local top, left = frame:GetTop(), frame:GetLeft()
+  frame:SetHeight(self.titleHeight + 10 + (self.buttonSize + self.verticalSpacing) * visible)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+  if visible == 0 then
+    frame:Hide()
+  end
+end
+function LA:GetVisible()
+  return self.visible
+end
+function LA:Hide()
+  local frame = self.frame
+  if not self.inCombat then
+    for i = 1, self:GetVisible() do
+      self.buttons[i]:SetChecked(false)
+      self.buttons[i]:Hide()
+    end
+    self:SetVisible(0)
+  else
+    table.insert(self.queue, { kind = "HIDE" })
+  end
+end
+
 -- Adapted from SpellBookFrame.lua
 function LA:UpdateButton(button)
   local id = button:GetID();

@@ -13,13 +13,30 @@ function LA:GlobalSpellID(id)
   -- end
   return select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 end
+
 function LA:UnLinkSpell(link)
   local globalID, name = string.match(link, "Hspell:([^|]+)|h%[([^]]+)%]")
   return name, tonumber(globalID)
 end
+
+-- do not modify the return value of this method
+function LA:SpellInfo(globalID, name, link, passive)
+  local infoCache = self.spellInfoCache
+  
+  infoCache[globalID] = infoCache[globalID] or {
+    name = name or (GetSpellInfo(globalID)),
+    passive = passive or IsPassiveSpell(globalID),
+    link = link or GetSpellLink(globalID)
+  }
+  return infoCache[globalID]
+end
+
 function LA:UpdateSpellBook()
-  wipe(self.spellBookCache)
-  wipe(self.flyoutCache)
+  
+  local infoCache = self.spellInfoCache
+  local bookCache = self.spellBookCache
+  wipe(bookCache) -- trash generated oh noes
+  wipe(self.flyoutCache) -- trash generated oh noes
   local numKnown = 0
   local i = 1
   -- CATA -- local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
@@ -39,18 +56,18 @@ function LA:UpdateSpellBook()
         known = known,
         id = spellGlobalID
       }
-    else
+    else -- not a flyout
       known = IsSpellKnown(spellGlobalID)
-      -- BOOGA -- local spellIsPassive = IsPassiveSpell(i, BOOKTYPE_SPELL) or false
-      self.spellBookCache[spellGlobalID] = {
-        name = spellName,
-        status = spellStatus,
-        --subName = subSpellName or "",
-        globalID = spellGlobalID,
-        -- BOOGA -- passive = spellIsPassive,
-        spellBookID = i,
-        known = known
-      }
+      -- invariant info
+      self:SpellInfo(spellGlobalID, spellName)
+      bookCache[spellGlobalID] = bookCache[spellGlobalID] or { } -- trash not generated yay
+      local bookItem = bookCache[spellGlobalID]
+      -- variable info
+      --bookItem.globalID = spellGlobalID -- redundant
+      bookItem.known = known
+      bookItem.status = spellStatus
+      bookItem.bookID = i
+      bookItem.info = infoCache[spellGlobalID] -- convenience link
     end
     i = i + 1
     if known then
@@ -69,7 +86,7 @@ function LA:AddSpell(id, new)
     action = "LEARN"
   end
   if self.inCombat then
-    table.insert(self.queue, { action = action, id = id, kind = BOOKTYPE_SPELL })
+    table.insert(self.queue, { action = action, id = id, kind = BOOKTYPE_SPELL }) -- trash oh noes
   else
     if new then
       self:LearnSpell(BOOKTYPE_SPELL, id)
@@ -83,7 +100,7 @@ end
 
 function LA:RemoveSpell(id)
   if self.inCombat then
-    table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL })
+    table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL }) -- trash oh noes
   else
     self:ClearButtonID(BOOKTYPE_SPELL, id)
     self:ForgetSpell(id)
@@ -115,13 +132,14 @@ function LA:DiffSpellBook()
       old = flyout[spellGlobalID]
       if old == nil then
         updated = updated + 1
-        if known then 
-          table.insert(flyoutChanges, {kind="NEW", spellBookID = i, flyoutID = spellGlobalID, name = flyoutName})
+        if known then
+          table.insert(flyoutChanges, {kind="NEW", bookID = i, flyoutID = spellGlobalID, name = flyoutName}) -- garbage oh noes
         end
       else
         old.fresh = true
         if old.known ~= known then
-          table.insert(flyoutChanges, {kind="CHANGE", spellBookID = i, flyoutID = spellGlobalID, name=flyoutName})
+          -- assuming flyouts can go from unknown to known, but not known to unknown
+          table.insert(flyoutChanges, {kind="CHANGE", bookID = i, flyoutID = spellGlobalID, name=flyoutName}) -- garbage oh noes
           updated = updated + 1
         end
       end
@@ -131,15 +149,16 @@ function LA:DiffSpellBook()
       if old == nil then
         updated = updated + 1
         if known then
-          table.insert(changes, {kind="NEW", spellBookID = i, globalID = spellGlobalID, name = spellName})
+          table.insert(changes, {kind="NEW", bookID = i, globalID = spellGlobalID, name = spellName}) -- garbage oh noes
         end
       else
         old.fresh = true
         if old.known ~= known then
+          -- assuming spells can go from unknown to known, or known to removed, but not known to unknown
           updated = updated + 1
-          table.insert(changes, {kind="CHANGE", spellBookID = i, globalID = spellGlobalID, name = spellName})
-          self:DebugPrint("OLD: name "..old.name.." status "..old.status.." global "..old.globalID.." bookid "..old.spellBookID.." known "..tostring(old.known))
-          self:DebugPrint("NEW: name "..spellName.." status "..spellStatus.." global "..spellGlobalID.." bookid "..i.." known "..tostring(known))
+          table.insert(changes, {kind="CHANGE", bookID = i, globalID = spellGlobalID, name = spellName}) -- garbage oh noes
+          self:DebugPrint("CHANGE: name "..spellName.." global "..spellGlobalID.." old status "..old.status.." old bookid "..old.bookID.." old known "..tostring(old.known)
+            .." new status "..spellStatus.." new bookid "..i.." new known "..tostring(known))
         end
       end
     end
@@ -150,31 +169,31 @@ function LA:DiffSpellBook()
   for k, v in pairs(cache) do
     if not v.fresh then
       updated = updated + 1
-      table.insert(changes, {kind="REMOVE", spellBookID = v.spellBookID, globalID = v.globalID, name = v.name})
+      table.insert(changes, {kind="REMOVE", bookID = v.bookID, globalID = k, name = v.info.name}) -- garbage oh noes
     end
   end
   for k, v in pairs(flyout) do
     if not v.fresh then
       updated = updated + 1
-      table.insert(flyoutChanges, {kind="REMOVE", spellBookID = v.spellBookID, flyoutID = v.flyoutID, name = v.name})
+      table.insert(flyoutChanges, {kind="REMOVE", bookID = v.bookID, flyoutID = v.flyoutID, name = v.name}) -- garbage oh noes
     end
   end
   if updated > 0 then
     self:UpdateSpellBook()
     for k, v in ipairs(changes) do
-      self:DebugPrint("Spell name "..v.name.." change "..v.kind.." global "..v.globalID.." bookid "..v.spellBookID)
+      self:DebugPrint("Spell name "..v.name.." change "..v.kind.." global "..v.globalID.." bookid "..v.bookID)
       --self:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].subName..") id "..(i))
       if v.kind == "REMOVE" then
-        self:RemoveSpell(v.spellBookID)
+        self:RemoveSpell(v.bookID)
       --self:DebugPrint("New spell found: "..spellName.." ("..subSpellName..")") -- Old spell: "..cache[i + 1].name.." ("..cache[i + 1].rank..")")
       elseif v.kind == "NEW" then
-        self:AddSpell(v.spellBookID, true)
+        self:AddSpell(v.bookID, true)
       elseif v.kind == "CHANGE" then
-        self:AddSpell(v.spellBookID)
+        self:AddSpell(v.bookID)
       end
     end
     for k, v in ipairs(flyoutChanges) do
-      self:DebugPrint("Flyout "..v.spellBookID.." "..v.kind.." "..k.." "..v.flyoutID.." "..v.name)
+      self:DebugPrint("Flyout "..v.bookID.." "..v.kind.." "..k.." "..v.flyoutID.." "..v.name)
       if v.kind == "REMOVE" then
         -- ?? TODO
       elseif v.kind == "NEW" then
@@ -187,13 +206,14 @@ function LA:DiffSpellBook()
   if updated == 0 then updated = false end
   return updated
 end
-function LA:LearnSpell(kind, id)
+
+function LA:LearnSpell(kind, bookID)
   local frame = self.frame
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()
-    if button.kind == kind and buttonID >= id then
+    if button.kind == kind and buttonID >= bookID then
       button:SetID(buttonID + 1)
       self:UpdateButton(button)
     end
@@ -204,13 +224,13 @@ function LA:LearnSpell(kind, id)
       kind == BOOKTYPE_SPELL and
       self.character.unlearned and
       self.character.unlearned[spec] then
-    local globalID = self:GlobalSpellID(id)
+    local globalID = self:GlobalSpellID(bookID)
     for slot, oldIDs in pairs(self.character.unlearned[spec]) do
       local actionType = GetActionInfo(slot)
       for oldID in pairs(oldIDs) do
         --local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
         if oldID == globalID and actionType == nil then
-          PickupSpellBookItem(id, BOOKTYPE_SPELL)
+          PickupSpellBookItem(bookID, BOOKTYPE_SPELL)
           PlaceAction(slot)
           self.character.unlearned[spec][slot][oldID] = nil
         end
@@ -218,13 +238,14 @@ function LA:LearnSpell(kind, id)
     end
   end
 end
-function LA:ForgetSpell(id)
+
+function LA:ForgetSpell(bookID)
   local frame = self.frame
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()
-    if button.kind == BOOKTYPE_SPELL and buttonID > id then
+    if button.kind == BOOKTYPE_SPELL and buttonID > bookID then
       button:SetID(buttonID - 1)
       self:UpdateButton(button)
     end
