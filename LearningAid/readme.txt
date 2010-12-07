@@ -20,8 +20,8 @@ User Interface Reference
 
 Learning Aid Window
   Left-click and drag the titlebar to move the window.
-  Right-click on the titlebar to bring up the menu.
   Click the close box or middle-click on the titlebar to close the window.
+  Click on the lock icon to lock the window (to prevent it from moving) or unlock it.
 
 Action Buttons
   * Left- or right-click to perform the action.

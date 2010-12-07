@@ -1,5 +1,7 @@
 ### IN PROGRESS ###
 
+rapidly learning multiple pets: first pet (mr chilly) did not show up, subsequent pets (mini thor, core hound pup, warbot) did.
+
 test learning pet talents re: spam filter -- NOT WORKING
 test unlearning pet talents re: spam filter
 

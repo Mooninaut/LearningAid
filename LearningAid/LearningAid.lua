@@ -138,7 +138,7 @@ function LA:Init()
   titleBar.text:SetText(self:GetText("title"))
   titleBar.text:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
 
-  -- create close button
+  -- create close button in the upper right corner of the frame
   local closeButton = CreateFrame("Button", nil, titleBar)
   self.closeButton = closeButton
   closeButton:SetWidth(32)
@@ -150,6 +150,15 @@ function LA:Init()
   closeButton:SetHighlightTexture("Interface/BUTTONS/UI-Panel-MinimizeButton-Highlight")
   closeButton:SetScript("OnClick", function () self:Hide() end)
 
+  -- create lock button in the upper left corner of the frame
+  local lockButton = CreateFrame("Button", nil, titleBar)
+  self.lockButton = lockButton
+  lockButton:SetWidth(20)
+  lockButton:SetHeight(20)
+  lockButton:SetPoint("LEFT", titleBar, "LEFT", 15, 0)
+  lockButton:SetNormalTexture("Interface/LFGFrame/UI-LFG-ICON-LOCK")
+  lockButton:SetScript("OnClick", function() if self.saved.locked then self:Unlock() else self:Lock() end end)
+  
   -- initialize right-click menu
   self.menuTable = {
     { text = self:GetText("lockPosition"), 
@@ -672,13 +681,13 @@ function LA:Ignore(info, str)
       print(self:GetText("title")..": ".. self:GetText("listIgnored", titlecase))
     end
   end
-  for index, spell in pairs(self.spellBookCache) do
-    local spellLower = string.lower(spell.name)
+  for globalID, bookItem in pairs(self.spellBookCache) do
+    local spellLower = string.lower(bookItem.info.name)
     if strLower == spellLower then
       if not self.saved.ignore[self.localClass] then
         self.saved.ignore[self.localClass] = {}
       end
-      self.saved.ignore[self.localClass][spellLower] = spell.name
+      self.saved.ignore[self.localClass][spellLower] = bookItem.info.name
       self:UpdateButtons()
       break
     end
