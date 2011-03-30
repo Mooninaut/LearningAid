@@ -1,12 +1,12 @@
 ## Interface: 40000
-## Title: Learning Aid v1.11 Beta 2
+## Title: Learning Aid v1.11.1 Alpha
 ## Notes: Displays a bar of spells, abilities, tradeskills, mounts or mini-pets you've just learned.  By Jamash (Kil'jaeden-US)
 ## Notes-deDE: Zeigt eine Leiste mit Zaubersprüchen, Fähigkeiten, Berufsfertigkeiten, Reittieren und Fahrzeugen, oder Begleitern, die du gerade erst gelernt hast. Von Jamash (Kil'jaeden-US)
 ## Notes-koKR: 현재 습득한 주문, 능력, 전문기술, 탈것 혹은 애완동물의 바를 표시합니다. 만든이: Jamash (Kil'jaeden-US)
 ## SavedVariables: LearningAid_Saved
 ## SavedVariablesPerCharacter: LearningAid_Character
 ## Author: Jamash (Kil'jaeden-US)
-## Version: 1.11 Beta 2
+## Version: 1.11.1 Alpha
 ## X-Embeds: Ace3
 ## X-Category: Interface Enhancements
 

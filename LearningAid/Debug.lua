@@ -52,9 +52,10 @@ end
 function LA:ListJoin(...)
   local str = ""
   local argc = select("#", ...)
-  if argc == 1 and type(...) == "table" then
-    return self:ListJoin(unpack(...))
-  elseif argc >= 1 then
+  --if argc == 1 and type(...) == "table" then
+  --  return self:ListJoin(unpack(...))
+  --else
+  if argc >= 1 then
     str = str..tostring(...)
     for i = 2, argc do
       str = str..", "..tostring(select(i, ...))
@@ -63,11 +64,13 @@ function LA:ListJoin(...)
   return str
 end
 
+-- could be called as private:DebugPrint() or LearningAid:DebugPrint() so don't rely on self
 function private:DebugPrint(...)
-  private.debugCount = private.debugCount + 1
-  LearningAid_DebugLog[private.debugCount] = LA:ListJoin(...)
-  if private.debugCount > 5000 then
-    LearningAid_DebugLog[private.debugCount - 5000] = nil
+  local p = private
+  p.debugCount = p.debugCount + 1
+  LearningAid_DebugLog[p.debugCount] = LA:ListJoin(...)
+  if p.debugCount > p.debugLimit then
+    LearningAid_DebugLog[p.debugCount - p.debugLimit] = nil
   end
 end
 -- don't call the stub DebugPrint, call the real DebugPrint
@@ -98,21 +101,30 @@ private.meta = {
 function LA:DebugPrint() end
 
 --setmetatable(private.empty, private.meta)
-
+local junk = { }
+local function tset(t, ...)
+  wipe(t)
+	for i = 1, select("#", ...) do
+	  t[i] = (select(i, ...))
+  end
+	return t
+end
 -- call after original LA is in private.LA and LA is empty
 function private:Wrap(name, f)
-  if not self.wrappers[name] then
-    self.wrappers[name] = function(...)
-      self:DebugPrint(name.."("..LA:ListJoin(select(2,...))..")")
-      local result = { f(...) } -- junk table created, boo hoo
-      self:DebugPrint(name.."() return "..LA:ListJoin(unpack(result)))
-      return unpack(result)
-    end
-  end
+  self.wrappers[name] = self.wrappers[name] or function(...)
+	  self.tokenCount[name] = (self.tokenCount[name] or 0) + 1
+	  local count = self.tokenCount[name]
+		self:DebugPrint(name.."["..count.."]("..LA:ListJoin(select(2,...))..")")
+		tset(junk, f(...))
+		self:DebugPrint(name.."["..count.."]() return "..LA:ListJoin(unpack(junk)))
+		return unpack(junk)
+	end
   return self.wrappers[name]
 end
 
 function LA:Debug(flag, newValue)
+  -- TOOD: probably ought to redesign this
+	-- private.debug is the sum of the number of flags that are true
   local oldDebug = private.debug
   local newDebug = oldDebug
   local debugFlags = self.saved.debugFlags

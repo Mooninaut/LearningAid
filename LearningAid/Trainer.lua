@@ -31,8 +31,7 @@ function LA:CreateTrainAllButton()
        hideOnEscape = 1,
        whileDead = false
     }
-    self.ClassTrainerFrame_Update = ClassTrainerFrame_Update
-    ClassTrainerFrame_Update = function(...) self:ClassTrainerFrame_Update(...); self:GetAvailableTrainerServices() end
+    hooksecurefunc("ClassTrainerFrame_Update", function() LearningAid:GetAvailableTrainerServices() end)
     return button
   end
 end

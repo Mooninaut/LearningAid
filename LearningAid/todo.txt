@@ -26,6 +26,9 @@ Horked up real good from dropping AceEvent -- FIXED I THINK
 
 ### DESIGN BLAH ###
 
+51296 = GM cooking
+3413 = Expert cooking
+
 spells learned and unlearned
 name, link, id -- player spells/abilities
 
@@ -73,7 +76,7 @@ part the first: spell info database
     spell link
     --spell icon -- probably not needed?
     is spell passive?
-    possibly whether spell has class/racial/tradeskill/talent origin
+    possibly whether spell has class/racial/tradeskill/talent/guild origin
     type: tracking (irrelevant, no longer in spellbook, delete option), aura/presence/shapeshift/aspect/stance/form, totem
     is on a flyout?
 

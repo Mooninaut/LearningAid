@@ -1,6 +1,6 @@
-Learning Aid version 1.11
+Learning Aid version 1.11.1 Alpha
 Written by Jamash (Kil'jaeden US)
-Email: mooninaut@gmail.com
+Email: jamashkj@gmail.com
 
 To download the latest version of Learning Aid, please visit either
 http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx

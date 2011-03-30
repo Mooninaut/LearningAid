@@ -76,6 +76,7 @@ function LA:CHAT_MSG_SYSTEM(message)
   end
 end
 function LA:COMPANION_LEARNED()
+  self.companionsReady = true
   self:DiffCompanions()
 end
 function LA:COMPANION_UPDATE()
@@ -94,8 +95,8 @@ function LA:COMPANION_UPDATE()
         end
       end
     end
-  else
-    self:UpdateCompanions()
+--  else
+--    self:UpdateCompanions()
   end
 end
 function LA:CURRENT_SPELL_CAST_CHANGED()
@@ -117,6 +118,9 @@ function LA:PLAYER_ENTERING_WORLD()
 end
 -- when transitioning continents, instances, etc the spellbook may be in flux
 -- between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD
+function LA:PLAYER_GUILD_UPDATE()
+  self:UpdateGuild()
+end
 function LA:PLAYER_LEAVING_WORLD() 
   self:UnregisterEvent("SPELLS_CHANGED")
   self:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -164,7 +168,7 @@ function LA:SPELLS_CHANGED()
     self:UpdateCompanions()
   end
   if self.numSpells > 0 then
-    if self:DiffSpellBook() then
+    if self:DiffSpellBook() > 0 then
       if self.pendingBuyCount > 0 then
         self.pendingBuyCount = self.pendingBuyCount - 1
         if self.pendingBuyCount <= 0 then

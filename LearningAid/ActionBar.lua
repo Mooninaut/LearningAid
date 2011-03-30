@@ -116,15 +116,11 @@ function LA:FindMissingActions()
   local macroSpells = {}
   local flyouts = {}
   local numTrackingTypes = GetNumTrackingTypes()
-  local localClass, enClass = UnitClass("player")
-  local ignore
+  local ignore = self.saved.ignore[self.localClass] or {}
+  local ignoreProfessions = self.saved.ignore.professions or {}
   local bookCache = self.spellBookCache
   local infoCache = self.spellInfoCache
-  if self.saved.ignore[localClass] then
-    ignore = self.saved.ignore[localClass]
-  else
-    ignore = {}
-  end
+
   --[[
   if not self.saved.tracking then
     for trackingType = 1, numTrackingTypes do
@@ -135,7 +131,7 @@ function LA:FindMissingActions()
     end
   end
   ]]
-  if (not self.saved.totem) and enClass == "SHAMAN" then
+  if (not self.saved.totem) and self.enClass == "SHAMAN" then
     self:DebugPrint("Searching for totems")
     for totemType = 1, MAX_TOTEMS do
       local totemSpells = {GetMultiCastTotemSpells(totemType)}
@@ -180,7 +176,7 @@ function LA:FindMissingActions()
         end
       end
     elseif actionType == "macro" and actionID ~= 0 and self.saved.macros then
-      self:DebugPrint("Macro in slot", slot, "with ID", actionID)
+      self:DebugPrint("Macro in slot "..slot.." with ID "..actionID)
       local body = GetMacroBody(actionID)
       local spells = self:MacroSpells(body)
       for spell in pairs(spells) do

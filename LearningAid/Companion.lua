@@ -7,10 +7,8 @@ function LA:UpdateCompanions()
   if not self.companionCache then self.companionCache = {} end
   local mount = self:UpdateCompanionType("MOUNT")
   local critter = self:UpdateCompanionType("CRITTER")
-  if (mount > 0) or (critter > 0) then
+  if (mount > 0) or (critter > 0) and not self.companionsReady then
     self.companionsReady = true
-  else
-    self.companionsReady = false
   end
   return self.companionsReady
 end

@@ -1,0 +1,87 @@
+# 1.11
+
+Updated for WoW 4.0.1 (Pre-Cataclysm patch)
+
+Includes new "Train All" button on skill and class trainers.
+
+Interface updated to 40000
+
+# 1.10.1
+
+Chinese localizations added (zhCN and zhTW), kindly provided by wowuicn.
+
+# 1.10
+
+The Learning Aid window now grows wider when there are too many
+abilities on it to fit in one column.
+
+Korean localization added, kindly provided by talkswind.
+
+# 1.09
+
+The "Find Shapeshift forms" toggle was backwards.  Fixed.
+
+New Ignore Ability function.  Ctrl-click on an icon in the Learning Aid
+window to ignore that ability when using the Search feature.
+
+You can also use /la ignore Ability Name and /la unignore Ability Name
+
+/la unignoreall to reset the list of ignored abilities
+
+When the option "Show Learn/Unlearn Messages" is set to "Summarize",
+spells that are unlearned and immediately relearned while swapping
+talent specs are not printed to the chat log.
+
+# 1.08
+
+Added an option to toggle whether to search for Shaman totems when
+searching for abilities missing from action bars.
+
+Fixed wrong companion bug (again).
+
+# 1.07.3
+
+Fixed a bug that caused incorrect text to appear on the context menu.
+
+# 1.07.2
+
+Added German translation kindly provided by Freydis88.
+
+# 1.07.1
+
+Fixed long-standing bug that caused the wrong companion to appear when
+learning a new companion under laggy conditions.
+
+# 1.07 Completed Features
+
+When the player unlearns a spell or ability due to a talent reset,
+remember where on the player's action bars that spell or ability was.
+When the spell or ability is relearned, put it back on the player's
+action bar in the same place, as long as that slot is empty.
+
+Same as above, but due to a server-side talent reset.
+
+Remember multiple sets of unlearned ability to action bar button
+mappings.
+
+Filter "You have learned" and "You have unlearned" spam down to two
+lines, saying "You have unlearned A, B, C." and "You have learned X, Y,
+Z."
+  Dual Spec Swapping: Complete
+  Unlearning Talents: Complete
+  Batch-learning Talents with the Talent Preview system: Complete
+  Batch-learning Talents with an addon: Complete
+  Singly-learning Talents with multiple ranks: Complete
+  Pet Talents: Complete
+
+# Future
+
+Rewrite event handlers using the new 3.0 Secure State system.
+
+Fix macro scanner to work with spells that have parentheses in their
+names, such as "Swipe (Bear)".
+
+# Possible
+
+Rewrite entire spell learn / unlearn system to use the system chat
+message event instead of caching and diffing.

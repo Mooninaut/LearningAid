@@ -1,0 +1,62 @@
+# Data Structures #
+
+## Saved Variables ##
+
+### Per Account ###
+
+#### Options ####
+
+totem = <boolean> (default = true)
+  search for missing Totem spells when scanning action bars
+
+restoreActions = <boolean> (default = true)
+  When re-learning previously unlearned spells, put them back on the
+  action bar where they were (if the space is empty)
+  
+filterSpam = <integer> (default = 1)
+  0: Do not filter learning spam
+  1: Summarize learning spam in one or two lines
+  2: Do not display any learning spam
+
+locked = <boolean>
+  If true, the Learning Aid frame cannot be moved by dragging
+  If nil or false, the Learning Aid frame can be moved by dragging
+
+frameStrata = <string>
+  What frame strata should the Learning Aid frame be displayed at
+
+macros = <boolean> (default = true)
+  Whether to search inside macros for missing spells and abilities when
+  scanning action bars
+  
+#### Misc ####
+
+dataVersion = <integer>
+  Incremented when significant changes occur to saved variables format
+  nil in versions prior to 1.11.1
+  1 in 1.11.1
+
+x = <float>
+y = <float>
+  X and Y coordinates for the upper-left corner of the Learning Aid window
+  The origin is in the lower-left corner of the screen, using Blizzard's own weird
+  coordinate system
+
+version = <string>
+  The version of Learning Aid that the variables were saved with
+
+debugFlags = <table>
+  log debug messages and table accesses to LearningAid_DebugLog
+  SET = <boolean> (default false)
+    log updates to addon table values
+  CALL = <boolean> (default false)
+    log updates to addon methods
+  GET = <boolean> (default false)
+    log reads of addon table values
+
+#### Ignore List ####
+
+ignore = table
+
+### Per Character ###
+

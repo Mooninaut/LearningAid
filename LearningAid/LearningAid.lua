@@ -1,13 +1,15 @@
--- Learning Aid v1.11 Beta 2 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.11.1 Alpha by Jamash (Kil'jaeden-US)
 -- LearningAid.lua
 
 local addonName, private = ...
 
 private.debug = 0
 private.debugCount = 0
+private.debugLimit = 5000 -- how many lines of log to keep before deleting earliest line
 private.shadow = { }
 private.wrappers = { }
 private.debugFlags = { }
+private.tokenCount = { }
 private.noLog = {
   GetVisible = true,
   GetText = true,
@@ -15,7 +17,8 @@ private.noLog = {
 }
 
 local LA = { 
-  version = "1.11",
+  version = "1.11.1 Alpha",
+  dataVersion = 1,
   name = addonName,
   titleHeight = 40, -- pixels
   frameWidth = 200, -- pixels
@@ -58,6 +61,25 @@ local LA = {
 --  petLearning = false,
   activatePrimarySpec = 63645, -- global spellID
   activateSecondarySpec = 63644, -- global spellID
+	racialSpell = 20549, -- War Stomp (Tauren)
+	racialPassiveSpell = 20550, -- Endurance (Tauren)
+	ridingSpells = {
+		[33388] = true, -- apprentice (60% ground)
+		[33391] = true, -- journeyman (100% ground)
+		[34090] = true, -- expert (150% flying)
+		[34091] = true, -- artisan (280% flying)
+		[90265] = true, -- master (310% flying)
+		[90267] = true, -- old world
+		[54197] = true  -- northrend
+	},
+  origin = {
+    profession = "P",
+    class = "C",
+    guild = "G",
+    riding = "RI",
+    race = "RA"
+  },
+  numProfessions = 6,
   buttons = { },
   queue = { },
   availableServices = { },
@@ -68,8 +90,9 @@ local LA = {
     CRITTER = { }
   },
   spellBookCache = { },
+  oldSpellBookCache = { },
   spellInfoCache = { },
-  spellsLearned = { },
+  spellsLearned  = { },
   spellsUnlearned = { },
   flyoutCache = { },
   numSpells = 0,
@@ -217,7 +240,7 @@ function LA:Init()
         name = self:GetText("restoreActions"),
         desc = self:GetText("restoreActionsHelp"),
         type = "toggle",
-        set = function(info, val) if val then self.saved.restoreActions = val end end,
+        set = function(info, val) self.saved.restoreActions = val end,
         get = function(info) return self.saved.restoreActions end,
         width = "full",
         order = 2
@@ -269,17 +292,6 @@ function LA:Init()
             -- width = "full",
             order = 1
           },
---[[ now obsolete; tracking skills appear on the tracking button on the minimap, not in the spellbook
-          tracking = {
-            name = self:GetText("findTracking"),
-            desc = self:GetText("findTrackingHelp"),
-            type = "toggle",
-            set = function(info, val) self.saved.tracking = val end,
-            get = function(info) return self.saved.tracking end,
-            width = "full",
-            order = 2
-          },
-]]
           shapeshift = {
             name = self:GetText("findShapeshift"),
             desc = self:GetText("findShapeshiftHelp"),
@@ -643,6 +655,12 @@ function LA:SetDefaultSettings()
   self.character = LearningAid_Character
   self.saved.version = self.version
   self.character.version = self.version
+  if not self.saved.dataVersion then
+    self.saved.dataVersion = self.dataVersion
+  end
+  if not self.character.dataVersion then
+    self.character.dataVersion = self.dataVersion
+  end
   for key, value in pairs(self.defaults) do
     if self.saved[key] == nil then
       self.saved[key] = value
@@ -662,7 +680,6 @@ function LA:SetDefaultSettings()
     end
   end
 end
-
 function LA:RegisterEvent(event)
   self.frame:RegisterEvent(event)
 --  self.events[event] = true -- EVENT DEBUGGING
@@ -672,24 +689,54 @@ function LA:UnregisterEvent(event)
   self.frame:UnregisterEvent(event)
 --  self.events[event] = false -- EVENT DEBUGGING
 end
-
-function LA:Ignore(info, str)
-  local strLower = string.lower(str)
-  if #strtrim(str) == 0 and self.saved.ignore[self.localClass] then
-    -- print ignore list to the chat frame
-    for lowercase, titlecase in pairs(self.saved.ignore[self.localClass]) do
-      print(self:GetText("title")..": ".. self:GetText("listIgnored", titlecase))
+function LA:UpgradeIgnoreList()
+  local ignore = self.saved.ignore
+  if ignore[self.localClass] then
+    for key, value in pairs(ignore[self.localClass]) do
+      -- TODO
+      if type(key) == "string" then -- old style ["spell name"] = "Spell Name"
+        local status, globalID = GetSpellBookItemInfo(value)
+        if globalID then
+          ignore[self.localClass][globalID] = GetSpellLink(globalID)
+          ignore[self.localClass][key] = nil
+        end
+      end
     end
   end
-  for globalID, bookItem in pairs(self.spellBookCache) do
-    local spellLower = string.lower(bookItem.info.name)
-    if strLower == spellLower then
-      if not self.saved.ignore[self.localClass] then
-        self.saved.ignore[self.localClass] = {}
+end
+function LA:Ignore(info, str)
+  local ignore = self.saved.ignore
+  local strLower = string.lower(str)
+  if #strtrim(str) == 0 then
+    -- print ignore list to the chat frame
+    if ignore[self.localClass] then
+      for globalID, spellLink in pairs(ignore[self.localClass]) do
+        print(self:GetText("title")..": ".. self:GetText("listIgnored", spellLink))
       end
-      self.saved.ignore[self.localClass][spellLower] = bookItem.info.name
-      self:UpdateButtons()
-      break
+    end
+    if ignore.profession then
+      for globalID, spellLink in pairs(ignore.profession) do
+        print(self:GetText("title")..": "..self:GetText("listIgnored", spellLink))
+      end
+    end
+  else
+    for globalID, bookItem in pairs(self.spellBookCache) do
+      local spellLower = string.lower(bookItem.info.name)
+      if strLower == spellLower then
+        if bookItem.origin == self.origin.profession then
+          if not ignore.profession then
+            ignore.profession = { }
+          end
+          ignore.profession[globalID] = bookItem.info.link
+        else
+          if not ignore[self.localClass] then
+            ignore[self.localClass] = {}
+          end
+          ignore[self.localClass][globalID] = bookItem.info.link
+        end
+        self:UpdateButtons()
+        break
+      end
     end
   end
 end
@@ -727,15 +774,6 @@ end
 function LA:AceSlashCommand(msg)
   LibStub("AceConfigCmd-3.0").HandleCommand(LearningAid, "la", "LearningAidConfig", msg)
 end
-
---[[ FormatSpells(t)
-  t = {
-    link = { globalSpellID = "spellLink", globalSpellID = "spellLink", ... },
-    name = { globalSpellID = "spell name", globalSpellID = "spell name", ... },
-    index = { }
-  }
---]]
-
 function LA:SystemPrint(message)
   local systemInfo = ChatTypeInfo["SYSTEM"]
   DEFAULT_CHAT_FRAME:AddMessage(LA:GetText("title")..": "..message, systemInfo.r, systemInfo.g, systemInfo.b, systemInfo.id)
@@ -783,7 +821,7 @@ function LA:FormatSpells(t)
     table.insert(sortIndex, globalID)
   end
   table.sort(sortIndex, function(a,b)
-    self:DebugPrint("a = "..a..", b = "..b)
+    --self:DebugPrint("a = "..a..", b = "..b)
     return infoCache[a].name < infoCache[b].name
   end)
   local str = ""
