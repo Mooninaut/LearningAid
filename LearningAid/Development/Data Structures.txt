@@ -4,6 +4,8 @@
 
 ### Per Account ###
 
+self.saved = <table>
+
 #### Options ####
 
 totem = <boolean> (default = true)
@@ -56,7 +58,79 @@ debugFlags = <table>
 
 #### Ignore List ####
 
-ignore = table
+##### OLD STYLE PRE-1.11.1, DO NOT USE, FOR REFERENCE ONLY (before dataVersion == 1) #####
+
+ignore = <table>
+  keys: <string> character class (locale dependent)
+  values: <table>
+    keys: <string> lowercase spell name
+    values: <string> original case spell name
+
+##### New Style 1.11.1 Ignore List (dataVersion == 1) #####
+
+ignore = <table>
+  keys: <string> character class (locale independent) or "professions"
+  values: <table>
+    keys: <integer> Global spell ID of ignored spell
+      values: <boolean> true if spell is ignored
 
 ### Per Character ###
 
+character = <table>
+  dataVersion = <integer> Version of the saved variable data format
+  version = <string> Version string of Learning Aid that the file was saved with
+  guild = <string> Name of the guild the character was in when the file was saved
+  actions = <table> TODO: describe this
+  guildSpells = <table>
+    keys: <integer> Global spell ID of a non-passive guild perk
+    values: TODO: describe this
+
+## Spell Cache ##
+
+### Invariant Cache ###
+
+Data that should not change during a game session
+
+self.spellInfoCache = {
+  <integer> = { -- globalID of a spell
+    name = <string>, -- Name of spell
+    subName = <string>, -- SubName of spell
+      -- Examples: "Passive", "Racial Passive", "Apprentice", "Cat Form", "Bear Form"
+    passive = <boolean>, -- true if spell is passive, false otherwise
+    link = <string>, -- return value of GetSpellLink(globalID)
+    globalID -- just in case
+  },
+  <integer> = { -- globalID of another spell
+    ...
+  },
+  ...
+}
+
+### Spellbook Cache ###
+
+Variable spell information, may or may not change during a game session
+
+spellBookCache = {
+  <integer> = { -- globalID of spell
+    known = <boolean>, -- does the active character know this spell right now
+    status = <string>, -- one of "SPELL", "FUTURESPELL", "FLYOUT"
+    bookID = <integer>, -- index in spellbook
+    info = <table reference>, -- convenience link to spellInfoCache[globalID]
+    origin = <string> -- one of the constants in self.origin (profession, class, guild, riding, race)
+
+    subOrigin = <string> -- if origin is self.origin.profession, index of profession as returned by GetProfessions()
+  },
+  ...
+}
+
+Flyout information, may or may not change during a game session
+flyoutCache = {
+  <integer> = { -- flyoutID
+    name = <string>, -- name of flyout
+    description = <string>, -- tooltip text
+    count = <integer>, -- number of spells in the flyout
+    known = <boolean>, -- is it known by the current character
+    bookID = <integer> -- index in spellbook
+  },
+  ...
+}

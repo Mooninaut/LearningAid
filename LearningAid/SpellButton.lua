@@ -29,7 +29,7 @@ function LA:CreateButton()
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
     if spellButton.kind == BOOKTYPE_SPELL then
-      self:ToggleIgnore(spellButton.spellName:GetText())
+      self:ToggleIgnore(select(2, GetSpellBookItemInfo(spellButton:GetID(), BOOKTYPE_SPELL)))
       self:UpdateButton(spellButton)
     end
   end
@@ -227,7 +227,7 @@ end
 
 -- Adapted from SpellBookFrame.lua
 function LA:UpdateButton(button)
-  local id = button:GetID();
+  local id = button:GetID()
 
   local name = button:GetName()
   local iconTexture = _G[name.."IconTexture"]
@@ -272,6 +272,7 @@ function LA:UpdateButton(button)
     end
 
     local spellName, subSpellName = GetSpellBookItemName(id, BOOKTYPE_SPELL)
+    local globalID = select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 
     -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
     highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
@@ -290,9 +291,8 @@ function LA:UpdateButton(button)
     else
       spellString:SetPoint("LEFT", button, "RIGHT", 4, 2)
     end
-    if self.saved.ignore[self.localClass] and
-       self.saved.ignore[self.localClass][string.lower(spellName)] then
-      iconTexture:SetVertexColor(0.8, 0.1, 0.1) -- cribbed from Bartender4
+    if self:IsIgnored(globalID) then
+      iconTexture:SetVertexColor(0.8, 0.1, 0.1) -- red color cribbed from Bartender4
     end
   elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
 

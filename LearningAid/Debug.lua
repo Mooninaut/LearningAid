@@ -155,12 +155,14 @@ function LA:Debug(flag, newValue)
     end
     setmetatable(LA, private.meta)
     LearningAid_DebugLog = { }
+    LearningAid_Saved.debugLog = LearningAid_DebugLog
   elseif oldDebug > 0 and newDebug == 0 then -- we're turning debugging off
     setmetatable(LA, nil)
     for k, v in pairs(shadow) do
       LA[k] = shadow[k]
       shadow[k] = nil
     end
+    LearningAid_Saved.debugLog = nil
   end
 
   private.debug = newDebug

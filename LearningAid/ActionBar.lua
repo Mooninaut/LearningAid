@@ -116,8 +116,6 @@ function LA:FindMissingActions()
   local macroSpells = {}
   local flyouts = {}
   local numTrackingTypes = GetNumTrackingTypes()
-  local ignore = self.saved.ignore[self.localClass] or {}
-  local ignoreProfessions = self.saved.ignore.professions or {}
   local bookCache = self.spellBookCache
   local infoCache = self.spellInfoCache
 
@@ -213,6 +211,7 @@ function LA:FindMissingActions()
     local spellName = spell.info.name
     spellNameLower = string.lower(spellName)
     if spell.known and
+      (not self:IsIgnored(globalID)) and
       (not actions[globalID]) and -- spell is not on any action bar
       (not spell.info.passive) and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
@@ -220,8 +219,7 @@ function LA:FindMissingActions()
       (not shapeshift[globalID]) and
       (not totem[globalID]) and
       (not macroSpells[spellNameLower]) and
-      (not macroSpells[globalID]) and
-      (not ignore[spellNameLower])
+      (not macroSpells[globalID])
     then
       -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
       self:DebugPrint("Spell "..spellName.." is not on any action bar.")

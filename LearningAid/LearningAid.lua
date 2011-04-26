@@ -1,4 +1,4 @@
--- Learning Aid v1.11.1 Alpha by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.11.1 by Jamash (Kil'jaeden-US)
 -- LearningAid.lua
 
 local addonName, private = ...
@@ -10,14 +10,19 @@ private.shadow = { }
 private.wrappers = { }
 private.debugFlags = { }
 private.tokenCount = { }
-private.noLog = {
+private.noLog = { -- do not log calls to these functions even when call logging is enabled
   GetVisible = true,
   GetText = true,
-  ListJoin = true
+  ListJoin = true,
+  SpellInfo = true,
+  SpellBookInfo = true,
+  PLAYER_GUILD_UPDATE = true,
+  UpdateGuild = true,
+  COMPANION_UPDATE = true
 }
 
 local LA = { 
-  version = "1.11.1 Alpha",
+  version = "1.11.1",
   dataVersion = 1,
   name = addonName,
   titleHeight = 40, -- pixels
@@ -73,11 +78,11 @@ local LA = {
 		[54197] = true  -- northrend
 	},
   origin = {
-    profession = "P",
-    class = "C",
-    guild = "G",
-    riding = "RI",
-    race = "RA"
+    profession = "profession",
+    class = "class",
+    guild = "guild",
+    riding = "riding",
+    race = "race"
   },
   numProfessions = 6,
   buttons = { },
@@ -89,6 +94,7 @@ local LA = {
     MOUNT = { },
     CRITTER = { }
   },
+  ignore = { },
   spellBookCache = { },
   oldSpellBookCache = { },
   spellInfoCache = { },
@@ -132,10 +138,10 @@ end
 
 function LA:Init()
   --self:DebugPrint("Initialize()")
-  self:SetDefaultSettings()
-  local version, build, buildDate, tocversion = GetBuildInfo()
+  self.localClass, self.enClass = UnitClass("player")
+  self.tocVersion = select(4, GetBuildInfo())
   self.locale = GetLocale()
-  self.tocVersion = tocversion
+  self:SetDefaultSettings()
 
   -- set up main frame
   local frame = self.frame
@@ -315,14 +321,14 @@ function LA:Init()
             desc = self:GetText("ignoreHelp"),
             type = "input",
             guiHidden = true,
-            set = "Ignore"
+            set = "ChatCommandIgnore"
           },
           unignore = {
             name = self:GetText("unignore"),
             desc = self:GetText("unignoreHelp"),
             type = "input",
             guiHidden = true,
-            set = "Unignore"
+            set = "ChatCommandUnignore"
           },
           unignoreall = {
             order = 5,
@@ -481,7 +487,6 @@ function LA:Init()
       }
     }
   }
-  self.localClass, self.enClass = UnitClass("player")
   if self.enClass == "SHAMAN" then
     self.options.args.missing.args.totem = {
       name = self:GetText("findTotem"),
@@ -560,6 +565,7 @@ function LA:Init()
     "PLAYER_LEVEL_UP",
     "PLAYER_LOGIN",
     "PLAYER_LOGOUT",
+    "PLAYER_GUILD_UPDATE",
     "PLAYER_REGEN_DISABLED",
     "PLAYER_REGEN_ENABLED",
 --    "SPELLS_CHANGED", -- wait until PLAYER_LOGIN
@@ -655,17 +661,20 @@ function LA:SetDefaultSettings()
   self.character = LearningAid_Character
   self.saved.version = self.version
   self.character.version = self.version
-  if not self.saved.dataVersion then
-    self.saved.dataVersion = self.dataVersion
-  end
-  if not self.character.dataVersion then
-    self.character.dataVersion = self.dataVersion
-  end
+  self.saved.dataVersion = self.dataVersion
+  self.character.dataVersion = self.dataVersion
+
   for key, value in pairs(self.defaults) do
     if self.saved[key] == nil then
       self.saved[key] = value
     end
   end
+  self.saved.ignore[self.enClass] = self.saved.ignore[self.enClass] or { }
+  self.ignore.class = self.saved.ignore[self.enClass]
+  self.saved.ignore.profession = self.saved.ignore.profession or { }
+  self.ignore.profession = self.saved.ignore.profession
+  self.saved.ignore.guild = self.saved.ignore.guild or { }
+  self.ignore.guild = self.saved.ignore.guild
   -- update with new debug option format as of 1.11
   if self.saved.debug ~= nil then
     if self.saved.debug then
@@ -684,7 +693,6 @@ function LA:RegisterEvent(event)
   self.frame:RegisterEvent(event)
 --  self.events[event] = true -- EVENT DEBUGGING
 end
-
 function LA:UnregisterEvent(event)
   self.frame:UnregisterEvent(event)
 --  self.events[event] = false -- EVENT DEBUGGING
@@ -692,76 +700,92 @@ end
 function LA:UpgradeIgnoreList()
   local ignore = self.saved.ignore
   if ignore[self.localClass] then
-    for key, value in pairs(ignore[self.localClass]) do
-      -- TODO
-      if type(key) == "string" then -- old style ["spell name"] = "Spell Name"
-        local status, globalID = GetSpellBookItemInfo(value)
-        if globalID then
-          ignore[self.localClass][globalID] = GetSpellLink(globalID)
-          ignore[self.localClass][key] = nil
+    local oldIgnore = ignore[self.localClass]
+    for spellLower, spellName in pairs(oldIgnore) do
+      if type(spellLower) == "string" then -- old-style ignore list
+        if self:ChatCommandIgnore(nil, spellName) then -- successfully converted format
+          oldIgnore[spellLower] = nil
         end
       end
     end
+    if self.localClass ~= self.enClass and not next(oldIgnore) then -- converted all old entries
+      ignore[self.localClass] = nil
+    end
   end
 end
-function LA:Ignore(info, str)
-  local ignore = self.saved.ignore
-  local strLower = string.lower(str)
-  if #strtrim(str) == 0 then
+function LA:Ignore(globalID)
+  self:UpgradeIgnoreList()
+  local bookItem = self.spellBookCache[globalID]
+  if bookItem and self.ignore[bookItem.origin] and not bookItem.info.passive then
+    if bookItem.origin == self.origin.profession then
+      self.ignore[bookItem.origin][bookItem.info.name] = true
+    else
+      self.ignore[bookItem.origin][globalID] = true
+    end
+    self:UpdateButtons()
+    return true
+  end
+  return false
+end
+function LA:ChatCommandIgnore(info, str)
+  str = strtrim(str)
+  if #str == 0 then
     -- print ignore list to the chat frame
-    if ignore[self.localClass] then
-      for globalID, spellLink in pairs(ignore[self.localClass]) do
-        print(self:GetText("title")..": ".. self:GetText("listIgnored", spellLink))
-      end
-    end
-    if ignore.profession then
-      for globalID, spellLink in pairs(ignore.profession) do
-        print(self:GetText("title")..": "..self:GetText("listIgnored", spellLink))
+    for origin, t in pairs(self.ignore) do
+      for globalID, v in pairs(t) do
+        print(self:GetText("title")..": ".. self:GetText("listIgnored", GetSpellLink(globalID)))
       end
     end
   else
-    for globalID, bookItem in pairs(self.spellBookCache) do
-      local spellLower = string.lower(bookItem.info.name)
-      if strLower == spellLower then
-        if bookItem.origin == self.origin.profession then
-          if not ignore.profession then
-            ignore.profession = { }
-          end
-          ignore.profession[globalID] = bookItem.info.link
-        else
-          if not ignore[self.localClass] then
-            ignore[self.localClass] = {}
-          end
-          ignore[self.localClass][globalID] = bookItem.info.link
-        end
-        self:UpdateButtons()
-        break
-      end
+    local status, globalID = GetSpellBookItemInfo(str)
+    globalID = globalID or select(2, self:UnlinkSpell(str))
+    if globalID then
+      return self:Ignore(globalID)
     end
   end
 end
-function LA:Unignore(info, str)
-  if self.saved.ignore[self.localClass] then
-    local ignoreList = self.saved.ignore[self.localClass]
-    local strLower = string.lower(str)
-    if ignoreList[strLower] then
-      ignoreList[strLower] = nil
-      self:UpdateButtons()
+function LA:ChatCommandUnignore(info, str)
+  local status, globalID = GetSpellBookItemInfo(str:trim())
+  globalID = globalID or select(2, self:UnlinkSpell(str))
+  if globalID then
+    self:Unignore(globalID)
+  end
+end
+function LA:Unignore(globalID)
+  self:UpgradeIgnoreList()
+  local bookItem = self.spellBookCache[globalID]
+  if bookItem and self.ignore[bookItem.origin] then
+    if bookItem.origin == self.origin.profession then
+      self.ignore[bookItem.origin][bookItem.info.name] = nil
+    elseif self.ignore[bookItem.origin][globalID] then
+      self.ignore[bookItem.origin][globalID] = nil
+    end
+    self:UpdateButtons()
+    return true
+  end
+  return false
+end
+function LA:IsIgnored(globalID)
+  self:UpgradeIgnoreList()
+  local bookItem = self.spellBookCache[globalID]
+  if bookItem and self.ignore[bookItem.origin] then
+    if bookItem.origin == self.origin.profession then
+      return self.ignore[bookItem.origin][bookItem.info.name]
+    else
+      return self.ignore[bookItem.origin][globalID]
     end
   end
 end
-function LA:ToggleIgnore(spell)
-  local spellLower = string.lower(spell)
-  if self.saved.ignore[self.localClass] and
-     self.saved.ignore[self.localClass][spellLower] then
-    self:Unignore(nil, spell)
+function LA:ToggleIgnore(globalID)
+  if self:IsIgnored(globalID) then
+    self:Unignore(globalID)
   else
-    self:Ignore(nil, spell)
+    self:Ignore(globalID)
   end
 end
 function LA:UnignoreAll(info)
-  if self.saved.ignore[self.localClass] then
-    wipe(self.saved.ignore[self.localClass])
+  for kind, list in pairs(self.ignore) do
+    wipe(list)
   end
 end
 function LA:ResetFramePosition()

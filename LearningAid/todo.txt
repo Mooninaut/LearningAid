@@ -1,7 +1,5 @@
 ### IN PROGRESS ###
 
-rapidly learning multiple pets: first pet (mr chilly) did not show up, subsequent pets (mini thor, core hound pup, warbot) did.
-
 test learning pet talents re: spam filter -- NOT WORKING
 test unlearning pet talents re: spam filter
 
@@ -11,8 +9,6 @@ printing newly learned stuff isn't getting triggered, like I just learned Journe
   Same for learning class skills from a trainer -- passes through unmolested
   Learning talents seems to be working
 
-figure out how to handle non-class abilities (like mining, herbing, skinning) with the ignore feature, which currently stores ignore information by class
-
 filter tradeskills
   "You have learned how to create a new item: <item>."
 
@@ -21,8 +17,6 @@ AddButton cannot handle flyouts yet
 Spam filter: Spells learned from quests?
 
 Learn All does not properly detect when the player's character does not have enough money to buy everything
-
-Horked up real good from dropping AceEvent -- FIXED I THINK
 
 ### DESIGN BLAH ###
 
@@ -96,6 +90,12 @@ part the third: spam filter cache
 part the fourth: action bar cache?
 
 ### STUFF WHAT IS DONE ###
+
+figure out how to handle non-class abilities (like mining, herbing, skinning) with the ignore feature, which currently stores ignore information by class -- FIXED IN 1.11.1
+
+rapidly learning multiple pets: first pet (mr chilly) did not show up, subsequent pets (mini thor, core hound pup, warbot) did -- FIXED in 1.11.1
+
+Horked up real good from dropping AceEvent -- FIXED in 1.11.1
 
 fix spam filter for spells with the same name (cat mangle and bear mangle) -- done
 

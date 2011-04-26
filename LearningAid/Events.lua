@@ -53,7 +53,7 @@ function LA:CHAT_MSG_SYSTEM(message)
     end
   end
   if t then
-    local name, globalID = self:UnLinkSpell(str)
+    local name, globalID = self:UnlinkSpell(str)
     self:DebugPrint("Matched "..name, globalID)
     t[globalID] = true
     self:SpellInfo(globalID, name, str)
@@ -116,11 +116,11 @@ end
 function LA:PLAYER_ENTERING_WORLD()
   self:RegisterEvent("SPELLS_CHANGED")
 end
--- when transitioning continents, instances, etc the spellbook may be in flux
--- between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD
 function LA:PLAYER_GUILD_UPDATE()
   self:UpdateGuild()
 end
+-- when transitioning continents, instances, etc the spellbook may be in flux
+-- between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD
 function LA:PLAYER_LEAVING_WORLD() 
   self:UnregisterEvent("SPELLS_CHANGED")
   self:RegisterEvent("PLAYER_ENTERING_WORLD")

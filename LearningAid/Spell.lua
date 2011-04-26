@@ -1,47 +1,5 @@
 -- Spell.lua
 
---[[
-
-  Spell info cache format:
-	Invariant information, should not change during a game session
-	spellInfoCache = {
-	  <integer> = { -- globalID of a spell
-		  name = <string>, -- Name of spell
-			subName = <string>, -- SubName of spell. examples: "Passive", "Racial Passive", "Apprentice"
-			passive = <boolean>, -- true if spell is passive, false otherwise
-			link = <string>, -- return value of GetSpellLink(globalID)
-      globalID -- just in case
-	  },
-		<integer> = { -- globalID of another spell
-		  ...
-		},
-		...
-  }
-	Variable spell information, may or may not change during a game session
-	spellBookCache = {
-	  <integer> = { -- globalID of spell
-		  known = <boolean>, -- does the active character know this spell right now
-			status = <string>, -- one of "SPELL", "FUTURESPELL", "FLYOUT"
-			bookID = <integer>, -- index in spellbook
-			info = <table reference>, -- convenience link to spellInfoCache[globalID]
-      origin = <string> -- one of "C" (class), "RI" (riding), "G" (guild), "P" (profession), "RA" (race)
-      subOrigin = <string> -- if origin is "P", name of profession
-    },
-		...
-  }
-	Flyout information, may or may not change during a game session
-	flyoutCache = {
-	  <integer> = { -- flyoutID
-			name = <string>, -- name of flyout
-			description = <string>, -- tooltip text
-			count = <integer>, -- number of spells in the flyout
-			known = <boolean>, -- is it known by the current character
-			bookID = <integer> -- index in spellbook
-	  },
-	  ...
-	}
-]]
-
 local addonName, private = ...
 local LA = private.LA
 
@@ -56,7 +14,7 @@ function LA:SpellGlobalID(id)
   return select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 end
 
-function LA:UnLinkSpell(link)
+function LA:UnlinkSpell(link)
   local globalID, name = string.match(link, "Hspell:([^|]+)|h%[([^]]+)%]")
   return name, tonumber(globalID)
 end
@@ -132,24 +90,24 @@ function LA:UpdateSpellBook()
   end
   local racial = self:SpellInfo(self.racialSpell).subName
   local racialPassive = self:SpellInfo(self.racialPassiveSpell).subName
-  for i = 1, GetNumSpellTabs() do 
+  for i = 1, GetNumSpellTabs() do
     local tabName, tabTexture, tabOffset, tabSpells, tabIsGuild = GetSpellTabInfo(i)
     for k = tabOffset + 1, tabOffset + tabSpells do
       local spellStatus, spellGlobalID = GetSpellBookItemInfo(k, BOOKTYPE_SPELL)
       if spellStatus == "FLYOUT" then
         -- flyout spells are not included in the regular spell tabs, they're in gaps between the index
 		-- one tab ends at and the index the next tab starts
-		local flyoutID = spellGlobalID
+        local flyoutID = spellGlobalID
         local flyoutInfo = self:FlyoutInfo(flyoutID)
         for f = 1, flyoutInfo.count do
           local flyoutSpellID, isKnown = GetFlyoutSlotInfo(flyoutID, f)
           -- all flyout spells are class-based as of 4.1.0
           local bookID = FindSpellBookSlotBySpellID(flyoutSpellID)
-		  if bookID then -- non-known flyout spells don't have book ids
+          if bookID then -- non-known flyout spells don't have book ids
             self:SpellBookInfo(bookID, self.origin.class)
             numKnown = numKnown + (isKnown and 1 or 0)
             total = total + 1
-		  end
+          end
         end
       else
         local info = self:SpellInfo(spellGlobalID)
@@ -205,8 +163,9 @@ function LA:UpdateSpellBook()
 end
 function LA:UpdateGuild()
   if IsInGuild() then
-    if not self.character.guild or self.character.guild ~= (GetGuildInfo("player")) then
-      self.character.guild = (GetGuildInfo("player"))
+    local guildName = GetGuildInfo("player")
+    if guildName and guildName:len() > 0 and self.character.guild ~= guildName then
+      self.character.guild = guildName
       self.character.guildSpells = { }
     end
     return true
@@ -234,13 +193,14 @@ function LA:AddSpell(bookID, new)
       self:LearnSpell(BOOKTYPE_SPELL, bookID)
     end
     local bookInfo = self:SpellBookInfo(bookID)
-    if (not self.retalenting) and 
+    if (not self.retalenting) and
        (not bookInfo.info.passive) and
-       (not ((bookInfo.origin == self.origin.guild) and self:GuildSpellKnown(bookInfo.info.globalID)))
+       (not self:GuildSpellKnown(bookInfo.info.globalID))
     then
       -- Display button with draggable spell icon
       self:AddButton(BOOKTYPE_SPELL, bookID)
       if bookInfo.origin == self.origin.guild then
+        self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
         self.character.guildSpells[bookInfo.info.globalID] = true
       end
     end
@@ -291,105 +251,6 @@ function LA:DiffSpellBook()
   end
   -- TODO: Detect flyout changes (right now the spell button can't handle flyouts)
   return updated
---[[ old and busted
-  local cache = self.spellBookCache
-  local flyout = self.flyoutCache
-  for k, v in pairs(cache) do
-    v.fresh = false
-  end
-  for k, v in pairs(flyout) do
-    v.fresh = false
-  end
-  local changes = {}
-  local flyoutChanges = {}
-  local old
-  local spellGlobalID
-  local spellStatus
-  local updated = 0
-  -- begin spellbook scan
-  local i = 1
-  local spellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-  while spellName do
-    spellStatus, spellGlobalID = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
-    if spellStatus == "FLYOUT" then
-      local flyoutName, flyoutDescription, numFlyoutSpells, known = GetFlyoutInfo(spellGlobalID)
-      old = flyout[spellGlobalID]
-      if old == nil then
-        updated = updated + 1
-        if known then
-          table.insert(flyoutChanges, {kind="NEW", bookID = i, flyoutID = spellGlobalID, name = flyoutName}) -- garbage oh noes
-        end
-      else
-        old.fresh = true
-        if old.known ~= known then
-          -- assuming flyouts can go from unknown to known, but not known to unknown
-          table.insert(flyoutChanges, {kind="CHANGE", bookID = i, flyoutID = spellGlobalID, name=flyoutName}) -- garbage oh noes
-          updated = updated + 1
-        end
-      end
-    else
-      local known = IsSpellKnown(spellGlobalID)
-      old = cache[spellGlobalID]
-      if old == nil then
-        updated = updated + 1
-        if known then
-          table.insert(changes, {kind="NEW", bookID = i, globalID = spellGlobalID, name = spellName}) -- garbage oh noes
-        end
-      else
-        old.fresh = true
-        if old.known ~= known then
-          -- assuming spells can go from unknown to known, or known to removed, but not known to unknown
-          updated = updated + 1
-          table.insert(changes, {kind="CHANGE", bookID = i, globalID = spellGlobalID, name = spellName}) -- garbage oh noes
-          self:DebugPrint("CHANGE: name "..spellName.." global "..spellGlobalID.." old status "..old.status.." old bookid "..old.bookID.." old known "..tostring(old.known)
-            .." new status "..spellStatus.." new bookid "..i.." new known "..tostring(known))
-        end
-      end
-    end
-    i = i + 1
-    spellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-  end
-  -- end spellbook scan
-  for k, v in pairs(cache) do
-    if not v.fresh then
-      updated = updated + 1
-      table.insert(changes, {kind="REMOVE", bookID = v.bookID, globalID = k, name = v.info.name}) -- garbage oh noes
-    end
-  end
-  for k, v in pairs(flyout) do
-    if not v.fresh then
-      updated = updated + 1
-      table.insert(flyoutChanges, {kind="REMOVE", bookID = v.bookID, flyoutID = v.flyoutID, name = v.name}) -- garbage oh noes
-    end
-  end
-  if updated > 0 then
-    self:UpdateSpellBook()
-    for k, v in ipairs(changes) do
-      self:DebugPrint("Spell name "..v.name.." change "..v.kind.." global "..v.globalID.." bookid "..v.bookID)
-      --self:DebugPrint("Old spell removed: "..cache[i].name.." ("..cache[i].subName..") id "..(i))
-      if v.kind == "REMOVE" then
-        self:RemoveSpell(v.bookID)
-      --self:DebugPrint("New spell found: "..spellName.." ("..subSpellName..")") -- Old spell: "..cache[i + 1].name.." ("..cache[i + 1].rank..")")
-      elseif v.kind == "NEW" then
-        self:AddSpell(v.bookID, true)
-      elseif v.kind == "CHANGE" then
-        self:AddSpell(v.bookID)
-      end
-    end
-    for k, v in ipairs(flyoutChanges) do
-      self:DebugPrint("Flyout "..v.bookID.." "..v.kind.." "..k.." "..v.flyoutID.." "..v.name)
-      if v.kind == "REMOVE" then
-        -- ?? TODO
-      elseif v.kind == "NEW" then
-        -- ?? TODO
-      elseif v.kind == "CHANGE" then
-        -- ?? TODO
-      end
-    end
-  end
-  if updated == 0 then updated = false end
-  return updated
---]]
 end
 
 -- A new spellbook ID has been added, bumping existing spellbook IDs up by one
@@ -409,8 +270,8 @@ function LA:LearnSpell(kind, bookID)
       (not self.retalenting) and
       kind == BOOKTYPE_SPELL and
       self.character.unlearned and
-      self.character.unlearned[spec] then
-    local globalID = self:SpellGlobalID(bookID)
+      self.character.unlearned[spec] then    
+    local globalID = self:SpellBookInfo(bookID).info.globalID
     for slot, oldIDs in pairs(self.character.unlearned[spec]) do
       local actionType = GetActionInfo(slot)
       for oldID in pairs(oldIDs) do
