@@ -91,6 +91,8 @@ part the fourth: action bar cache?
 
 ### STUFF WHAT IS DONE ###
 
+Stack overflow due to infinite recursion in UpdateIgnoreList -- FIXED IN 1.11.2
+
 figure out how to handle non-class abilities (like mining, herbing, skinning) with the ignore feature, which currently stores ignore information by class -- FIXED IN 1.11.1
 
 rapidly learning multiple pets: first pet (mr chilly) did not show up, subsequent pets (mini thor, core hound pup, warbot) did -- FIXED in 1.11.1

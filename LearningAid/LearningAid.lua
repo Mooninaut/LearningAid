@@ -1,4 +1,4 @@
--- Learning Aid v1.11.1 by Jamash (Kil'jaeden-US)
+-- Learning Aid v1.11.2 by Jamash (Kil'jaeden-US)
 -- LearningAid.lua
 
 local addonName, private = ...
@@ -22,7 +22,7 @@ private.noLog = { -- do not log calls to these functions even when call logging 
 }
 
 local LA = { 
-  version = "1.11.1",
+  version = "1.11.2",
   dataVersion = 1,
   name = addonName,
   titleHeight = 40, -- pixels
@@ -714,7 +714,6 @@ function LA:UpgradeIgnoreList()
   end
 end
 function LA:Ignore(globalID)
-  self:UpgradeIgnoreList()
   local bookItem = self.spellBookCache[globalID]
   if bookItem and self.ignore[bookItem.origin] and not bookItem.info.passive then
     if bookItem.origin == self.origin.profession then
@@ -752,7 +751,6 @@ function LA:ChatCommandUnignore(info, str)
   end
 end
 function LA:Unignore(globalID)
-  self:UpgradeIgnoreList()
   local bookItem = self.spellBookCache[globalID]
   if bookItem and self.ignore[bookItem.origin] then
     if bookItem.origin == self.origin.profession then
@@ -766,7 +764,6 @@ function LA:Unignore(globalID)
   return false
 end
 function LA:IsIgnored(globalID)
-  self:UpgradeIgnoreList()
   local bookItem = self.spellBookCache[globalID]
   if bookItem and self.ignore[bookItem.origin] then
     if bookItem.origin == self.origin.profession then

@@ -56,9 +56,9 @@ function LA:MacroSpells(macroText)
             found = true
             self:DebugPrint('Token: "'..token..'"')
             spells[token] = true
-            local status, id = GetSpellBookItemInfo(token)
-            if id then 
-              spells[id] = true
+            local status, globalID = GetSpellBookItemInfo(token)
+            if globalID then 
+              spells[globalID] = true
             end
           end
         end

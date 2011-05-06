@@ -164,6 +164,7 @@ function LA:PLAYER_TALENT_UPDATE()
   end
 end
 function LA:SPELLS_CHANGED()
+  self:UpgradeIgnoreList()
   if not self.companionsReady then
     self:UpdateCompanions()
   end
