@@ -122,42 +122,6 @@ function LA:UpdateSpellBook()
       total = total + 1
     end
   end
---[[ old and busted
-  local i = 1
-  local spellName, subSpellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-  local known
-  while spellName do
-    local spellStatus, spellGlobalID = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
-    if spellStatus == "FLYOUT" then
-      local flyoutName, flyoutDescription, numFlyoutSpells
-      flyoutName, flyoutDescription, numFlyoutSpells, known = GetFlyoutInfo(spellGlobalID)
-      self.flyoutCache[spellGlobalID] = { -- actually a flyout ID (separate numeric namespace from spellIDs)
-        name = flyoutName,
-        description = flyoutDescription, 
-        count = numFlyoutSpells,
-        known = known,
-        bookID = i
-      }
-    else -- not a flyout
-      known = IsSpellKnown(spellGlobalID) -- boolean
-      -- invariant info
-      self:SpellInfo(spellGlobalID, spellName)
-      bookCache[spellGlobalID] = bookCache[spellGlobalID] or { } -- will be trashed next update
-      local bookItem = bookCache[spellGlobalID]
-      -- variable info
-      --bookItem.globalID = spellGlobalID -- redundant
-      bookItem.known = known
-      bookItem.status = spellStatus
-      bookItem.bookID = i
-      bookItem.info = infoCache[spellGlobalID] -- convenience link
-    end
-    i = i + 1
-    if known then
-      numKnown = numKnown + 1
-    end
-    spellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-  end
---]]
   self:DebugPrint("Updated Spellbook, "..total.." entries found, "..numKnown.." spells known.")
   self.numSpells = total
 end
@@ -241,7 +205,7 @@ function LA:DiffSpellBook()
         self:RemoveSpell(oldItem.bookID)
         updated = updated + 1
       elseif not new[oldID].known then
-        self:DebugPrint("Warning: Spell "..oldItem.name.." with globalID "..oldID.." forgotten but not removed!")
+        self:DebugPrint("Warning: Spell "..oldItem.info.name.." with globalID "..oldID.." forgotten but not removed!")
         updated = updated + 1
       end
     end

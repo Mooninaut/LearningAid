@@ -1,4 +1,37 @@
+### Learning Aid 1.13 / 2.0 Redesign Work ###
+
+Top down:
+
+1. Show an icon when the player learns an ability AND the ability is not already on their action bar AND they haven't chosen to ignore that ability
+
+  * Detect when an ability is learned
+    * Scanning the spellbook
+    * Watching events
+    * Chat filter
+  * Decide whether or not it is "new enough" to display
+    * Has it been learned before?
+    * Is it on an action bar already?
+  * Determine whether the user wants to see it
+    * Is it on the ignore list?
+    * What does the ignore list really mean?
+      * Class abilities
+        * Ignore this ability regardless of class
+        * Ignore this ability for this class only
+        * Ignore this ability for this character only
+      * Tradeskill abilities
+        * Ignore this ability for all characters
+        * Ignore this ability for this character
+        * Ignore all ranks of this ability or just this rank
+      * Guild abilities
+        * Ignore for all characters
+        * Ignore for this guild
+        * Ignore for this character
+
+
+
 ### IN PROGRESS ###
+
+got an error while learning Master Riding on the 4.2.0 PTR
 
 test learning pet talents re: spam filter -- NOT WORKING
 test unlearning pet talents re: spam filter
@@ -17,6 +50,7 @@ AddButton cannot handle flyouts yet
 Spam filter: Spells learned from quests?
 
 Learn All does not properly detect when the player's character does not have enough money to buy everything
+
 
 ### DESIGN BLAH ###
 

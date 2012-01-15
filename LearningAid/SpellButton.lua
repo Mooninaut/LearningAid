@@ -29,7 +29,7 @@ function LA:CreateButton()
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
     if spellButton.kind == BOOKTYPE_SPELL then
-      self:ToggleIgnore(select(2, GetSpellBookItemInfo(spellButton:GetID(), BOOKTYPE_SPELL)))
+      self:ToggleIgnore(self:SpellGlobalID(spellButton:GetID()))
       self:UpdateButton(spellButton)
     end
   end

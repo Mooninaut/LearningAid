@@ -1,4 +1,4 @@
--- Learning Aid v1.11.2 by Jamash (Kil'jaeden-US)
+-- Learning Aid by Jamash (Kil'jaeden-US)
 -- LearningAid.lua
 
 local addonName, private = ...
@@ -22,7 +22,7 @@ private.noLog = { -- do not log calls to these functions even when call logging 
 }
 
 local LA = { 
-  version = "1.11.2",
+  version = GetAddOnMetadata(addonName, "Version"),
   dataVersion = 1,
   name = addonName,
   titleHeight = 40, -- pixels
@@ -803,36 +803,37 @@ end
 function LA:ProcessQueue()
   if self.inCombat then
     self:DebugPrint("ProcessQueue(): Cannot process action queue during combat.")
-    return
-  end
-  local queue = self.queue
-  for index = 1, #queue do
-    local item = queue[index]
-    if item.action == "SHOW" then
-      self:AddButton(item.kind, item.id)
-    elseif item.action == "CLEAR" then
-      self:ClearButtonID(item.kind, item.id)
-    elseif item.kind == BOOKTYPE_SPELL then
-      if item.action == "LEARN" then
-        self:AddSpell(item.id)
-      elseif item.action == "FORGET" then
-        self:RemoveSpell(item.id)
+  else
+    self.queue = self.queue or { }
+    local queue = self.queue
+    for index = 1, #queue do
+      local item = queue[index]
+      if item.action == "SHOW" then
+        self:AddButton(item.kind, item.id)
+      elseif item.action == "CLEAR" then
+        self:ClearButtonID(item.kind, item.id)
+      elseif item.kind == BOOKTYPE_SPELL then
+        if item.action == "LEARN" then
+          self:AddSpell(item.id)
+        elseif item.action == "FORGET" then
+          self:RemoveSpell(item.id)
+        else
+          self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
+        end
+      elseif item.kind == "CRITTER" or item.kind == "MOUNT" then
+        if item.action == "LEARN" then
+          self:AddCompanion(item.kind, item.id)
+        else
+          self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
+        end
+      elseif item.kind == "HIDE" then
+        self:Hide()
       else
-        self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
+        self:DebugPrint("ProcessQueue(): Invalid entry type " .. item.kind)
       end
-    elseif item.kind == "CRITTER" or item.kind == "MOUNT" then
-      if item.action == "LEARN" then
-        self:AddCompanion(item.kind, item.id)
-      else
-        self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
-      end
-    elseif item.kind == "HIDE" then
-      self:Hide()
-    else
-      self:DebugPrint("ProcessQueue(): Invalid entry type " .. item.kind)
     end
+    wipe(self.queue)
   end
-  self.queue = {}
 end
 
 function LA:FormatSpells(t)
