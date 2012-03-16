@@ -22,7 +22,7 @@ function LA:CreateButton()
   button:SetAttribute("shift-type1", "linkSpell")
   button:SetAttribute("ctrl-type*", "toggleIgnore")
   button.hideButton = function(spellButton, mouseButton, down)
-    if not self.inCombat then
+    if not InCombatLockdown() then
       self:ClearButtonIndex(spellButton.index)
     end
   end
@@ -214,7 +214,7 @@ function LA:GetVisible()
 end
 function LA:Hide()
   local frame = self.frame
-  if not self.inCombat then
+  if not InCombatLockdown() then
     for i = 1, self:GetVisible() do
       self.buttons[i]:SetChecked(false)
       self.buttons[i]:Hide()
@@ -237,7 +237,7 @@ function LA:UpdateButton(button)
   local autoCastableTexture = _G[name.."AutoCastable"]
   local highlightTexture = _G[name.."Highlight"]
   -- CATA -- local normalTexture = _G[name.."NormalTexture"]
-  if not self.inCombat then
+  if not InCombatLockdown() then
     button:Enable()
   end
 
@@ -279,7 +279,7 @@ function LA:UpdateButton(button)
     spellString:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 
     -- Set Secure Action Button attribute
-    if not self.inCombat then
+    if not InCombatLockdown()then
       button:SetAttribute("spell*", spellName)
     end
 
@@ -303,7 +303,7 @@ function LA:UpdateButton(button)
     iconTexture:SetTexture(icon)
     spellString:SetText(creatureName)
     subSpellString:SetText("")
-    if not self.inCombat then
+    if not InCombatLockdown() then
       button:SetAttribute("spell*", spellName)
     end
   end

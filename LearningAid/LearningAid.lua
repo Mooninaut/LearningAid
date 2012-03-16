@@ -59,10 +59,12 @@ local LA = {
   },
   menuHideDelay = 5, -- seconds
   pendingBuyCount = 0,
-  inCombat = false,
-  retalenting = false,
-  untalenting = false,
-  learning = false,
+  state = {
+    --inCombat = false, -- InCombatLockdown() made this obsolete
+    retalenting = false,
+    untalenting = false,
+    learning = false
+  },
 --  petLearning = false,
   activatePrimarySpec = 63645, -- global spellID
   activateSecondarySpec = 63644, -- global spellID
@@ -499,11 +501,12 @@ function LA:Init()
     }
   end
   LibStub("AceConfig-3.0"):RegisterOptionsTable("LearningAidConfig", self.options, {"la", "learningaid"})
+  self:DebugPrint("Registering with AceConfig under '"..self:GetText("title").." "..self.version.."'")
   self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("LearningAidConfig", self:GetText("title").." "..self.version)
   hooksecurefunc("ConfirmTalentWipe", function()
     self:DebugPrint("ConfirmTalentWipe")
     self:SaveActionBars()
-    self.untalenting = true
+    self.state.untalenting = true
     --self.spellsUnlearned = {}
     self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
@@ -517,7 +520,7 @@ function LA:Init()
       self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
       --wipe(self.spellsLearned)
       --wipe(self.spellsUnlearned)
-      self.learning = true
+      self.state.learning = true
     end
   end)
   hooksecurefunc("SetCVar", function (cvar, value)
@@ -539,7 +542,7 @@ function LA:Init()
     self.LearnTalent(tab, talent, pet, group, ...)
     if rank < maxRank and meetsPrereq and not pet then
       --wipe(self.spellsLearned)
-      --self.learning = true
+      --self.state.learning = true
       if self.pendingTalentCount == 0 then wipe(self.pendingTalents) end
       self:RegisterEvent("PLAYER_TALENT_UPDATE")
       local id = (group or GetActiveTalentGroup()).."."..tab.."."..talent.."."..rank
@@ -570,6 +573,7 @@ function LA:Init()
     "PLAYER_REGEN_ENABLED",
 --    "SPELLS_CHANGED", -- wait until PLAYER_LOGIN
     "UNIT_SPELLCAST_START",
+    "UI_SCALE_CHANGED",
     "UPDATE_BINDINGS",
     "VARIABLES_LOADED"
 --[[
@@ -611,11 +615,11 @@ function LA:spellSpamFilter(chatFrame, event, message, ...)
   local patterns = self.patterns
   if (self.saved.filterSpam ~= self.FILTER_SHOW_ALL) and (
     (
-      self.untalenting or
-      self.retalenting or
+      self.state.untalenting or
+      self.state.retalenting or
      (self.pendingTalentCount > 0) or
      (self.saved.filterSpam == self.FILTER_SHOW_NONE) or
-      self.learning or
+      self.state.learning or
 --      self.petLearning or
       (self.pendingBuyCount > 0)
     ) and (
@@ -801,7 +805,7 @@ function LA:SystemPrint(message)
 end
 
 function LA:ProcessQueue()
-  if self.inCombat then
+  if InCombatLockdown() then
     self:DebugPrint("ProcessQueue(): Cannot process action queue during combat.")
   else
     self.queue = self.queue or { }

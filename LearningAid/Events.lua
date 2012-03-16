@@ -16,7 +16,7 @@ function LA:ACTIONBAR_SLOT_CHANGED(slot)
 -- then after untalenting actionbar1 = [nil] ["macro" 5] [nil]
 -- self.character.actions[spec][1][2354] = true
   
-  if self.untalenting then
+  if self.state.untalenting then
     -- something something on (slot)
     local spec = GetActiveTalentGroup()
     local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
@@ -136,17 +136,15 @@ function LA:PLAYER_LOGOUT()
   self:SaveActionBars()
 end
 function LA:PLAYER_REGEN_DISABLED()
-  self.inCombat = true
   self.closeButton:Disable()
 end
 function LA:PLAYER_REGEN_ENABLED()
-  self.inCombat = false
   self.closeButton:Enable()
   self:ProcessQueue()
 end
 function LA:PLAYER_TALENT_UPDATE()
-  if self.untalenting then
-    self.untalenting = false
+  if self.state.untalenting then
+    self.state.untalenting = false
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:UnregisterEvent("UI_ERROR_MESSAGE")
@@ -157,8 +155,8 @@ function LA:PLAYER_TALENT_UPDATE()
       self:PrintPending()
       self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     end
-  elseif self.learning then
-    self.learning = false
+  elseif self.state.learning then
+    self.state.learning = false
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
     self:PrintPending()
   end
@@ -211,10 +209,10 @@ LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
 function LA:UNIT_SPELLCAST_START(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
     (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    not self.retalenting
+    not self.state.retalenting
   then
     self:DebugPrint("Talent swap initiated")
-    self.retalenting = counter
+    self.state.retalenting = counter
     --self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
     self:RegisterEvent("UNIT_SPELLCAST_STOP", "OnEvent")
@@ -224,10 +222,10 @@ end
 function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
     (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    counter == self.retalenting
+    counter == self.state.retalenting
   then
     self:DebugPrint("Talent swap canceled")
-    self.retalenting = false
+    self.state.retalenting = false
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:UnregisterEvent("UNIT_SPELLCAST_STOP")
     self:UnregisterEvent("UNIT_SPELLCAST_FAILED_QUIET")
@@ -238,10 +236,10 @@ LA.UNIT_SPELLCAST_FAILED_QUIET = LA.UNIT_SPELLCAST_INTERRUPTED
 function LA:UNIT_SPELLCAST_STOP(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
     (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    counter == self.retalenting
+    counter == self.state.retalenting
   then
     self:DebugPrint("Talent swap completed")
-    self.retalenting = false
+    self.state.retalenting = false
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:UnregisterEvent("UNIT_SPELLCAST_STOP")
     self:UnregisterEvent("UNIT_SPELLCAST_FAILED_QUIET")
@@ -263,12 +261,15 @@ function LA:UNIT_SPELLCAST_STOP(unit, spellName, deprecated, counter, globalID)
   end
 end
 function LA:UI_ERROR_MESSAGE()
-  if self.untalenting then
+  if self.state.untalenting then
     self:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
     self:UnregisterEvent("UI_ERROR_MESSAGE")
     self:UnregisterEvent("PLAYER_TALENT_UPDATE")
-    self.untalenting = false
+    self.state.untalenting = false
   end
+end
+function LA:UI_SCALE_CHANGED(...)
+  self:DebugPrint("UI Scale changed: ",...)
 end
 function LA:UPDATE_BINDINGS()
   self:UpdateCompanions()

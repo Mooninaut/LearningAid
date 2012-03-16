@@ -102,7 +102,7 @@ function LA:SaveActionBars()
   end
 end
 function LA:FindMissingActions()
-  if self.inCombat then
+  if InCombatLockdown() then
     print(self:GetText("title")..": "..self:GetText("errorInCombat"))
     return
   end

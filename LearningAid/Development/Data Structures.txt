@@ -84,6 +84,10 @@ character = <table>
   guildSpells = <table>
     keys: <integer> Global spell ID of a non-passive guild perk
     values: TODO: describe this
+  unlearned = <table>
+    [spec <integer> Number of current spec. Can be 1 or 2.] = <table>
+	  [slot <integer> Action bar slot. Can be from 1 to 120.] = <table>
+	    [oldID <integer> Global spell id of spell that was unlearned.] = <boolean> Always true if exists
 
 ## Spell Cache ##
 

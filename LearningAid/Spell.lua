@@ -150,30 +150,32 @@ function LA:AddSpell(bookID, new)
   if new then
     action = "LEARN"
   end
-  if self.inCombat then
+  if InCombatLockdown() then
     table.insert(self.queue, { action = action, id = bookID, kind = BOOKTYPE_SPELL }) -- trash oh noes
   else
     if new then
       self:LearnSpell(BOOKTYPE_SPELL, bookID)
     end
     local bookInfo = self:SpellBookInfo(bookID)
-    if (not self.retalenting) and
+    if (not self.state.retalenting) and
        (not bookInfo.info.passive) and
        (not self:GuildSpellKnown(bookInfo.info.globalID))
     then
       -- Display button with draggable spell icon
-      self:AddButton(BOOKTYPE_SPELL, bookID)
       if bookInfo.origin == self.origin.guild then
         self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
         self.character.guildSpells[bookInfo.info.globalID] = true
+      else
+	    self:AddButton(BOOKTYPE_SPELL, bookID)
       end
+	  
     end
   end
 end
 
 -- a spell has been removed from the spellbook
 function LA:RemoveSpell(id)
-  if self.inCombat then
+  if InCombatLockdown() then
     table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL }) -- trash oh noes
   else
     self:ClearButtonID(BOOKTYPE_SPELL, id)
@@ -231,15 +233,14 @@ function LA:LearnSpell(kind, bookID)
   end
   local spec = GetActiveTalentGroup()
   if self.saved.restoreActions and
-      (not self.retalenting) and
+      (not self.state.retalenting) and
       kind == BOOKTYPE_SPELL and
       self.character.unlearned and
       self.character.unlearned[spec] then    
     local globalID = self:SpellBookInfo(bookID).info.globalID
     for slot, oldIDs in pairs(self.character.unlearned[spec]) do
-      local actionType = GetActionInfo(slot)
+      local actionType = GetActionInfo(slot) -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
       for oldID in pairs(oldIDs) do
-        --local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
         if oldID == globalID and actionType == nil then
           PickupSpellBookItem(bookID, BOOKTYPE_SPELL)
           PlaceAction(slot)

@@ -11,7 +11,7 @@ function LA:TestAdd(kind, ...)
     if kind == BOOKTYPE_SPELL then
       if GetSpellInfo(id, kind) and not IsPassiveSpell(id, kind) then
         print("Test: Adding button with spell id "..id)
-        if self.inCombat then
+        if InCombatLockdown() then
           table.insert(self.queue, { action = "SHOW", id = id, kind = kind })
         else
           self:AddButton(kind, id)
@@ -22,7 +22,7 @@ function LA:TestAdd(kind, ...)
     elseif kind == "CRITTER" or kind == "MOUNT" then
       if GetCompanionInfo(kind, id) then
         print("Test: Adding companion type "..kind.." id "..id)
-        if self.inCombat then
+        if InCombatLockdown() then
           table.insert(self.queue, { action = "SHOW", id = id, kind = kind})
         else
           self:AddButton(kind, id)
@@ -41,7 +41,7 @@ function LA:TestRemove(kind, ...)
   for i = 1, #t do
     local id = t[i]
     print("Test: Removing "..kind.." id "..id)
-    if self.inCombat then
+    if InCombatLockdown() then
       table.insert(self.queue, { action = "CLEAR", id = id, kind = kind })
     else
       self:ClearButtonID(kind, id)

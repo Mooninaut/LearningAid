@@ -40,7 +40,7 @@ function LA:DiffCompanions()
   self:DiffCompanionType("CRITTER")
 end
 function LA:AddCompanion(kind, id)
-  if self.inCombat then
+  if InCombatLockdown() then
     table.insert(self.queue, { action = "LEARN", id = id, kind = kind})
   else
     self:LearnSpell(kind, id)
