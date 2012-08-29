@@ -1,4 +1,4 @@
-# 1.12
+# 1.12a1
 
 Updated for WoW 5.0.4 (Pre-Mists of Pandaria patch)
 
