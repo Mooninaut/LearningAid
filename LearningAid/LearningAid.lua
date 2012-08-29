@@ -1,5 +1,39 @@
--- Learning Aid by Jamash (Kil'jaeden-US)
--- LearningAid.lua
+--[[
+
+Learning Aid version 1.12
+Compatible with World of Warcraft version 5.0.4
+Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Email: jamashkj@gmail.com
+
+LearningAid.lua is part of Learning Aid.
+
+  Learning Aid is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version.
+
+  Learning Aid is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with Learning Aid.  If not, see
+  <http://www.gnu.org/licenses/>.
+
+To download the latest official version of Learning Aid, please visit 
+either Curse or WowInterface at one of the following URLs: 
+
+http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx
+
+http://www.wowinterface.com/downloads/info10622-LearningAid.html
+
+Other sites that host Learning Aid are not official and may contain 
+outdated or modified versions. If you have obtained Learning Aid from 
+any other source, I strongly encourage you to use Curse or WoWInterface 
+for updates in the future. 
+
+]]
 
 local addonName, private = ...
 
@@ -18,7 +52,7 @@ private.noLog = { -- do not log calls to these functions even when call logging 
   SpellBookInfo = true,
   PLAYER_GUILD_UPDATE = true,
   UpdateGuild = true,
-  COMPANION_UPDATE = true
+  -- PANDARIA -- COMPANION_UPDATE = true
 }
 
 local LA = { 
@@ -92,10 +126,12 @@ local LA = {
   availableServices = { },
   petLearned = { },
   petUnlearned = { },
+  --[[ PANDARIA
   companionCache = {
     MOUNT = { },
     CRITTER = { }
   },
+  ]]
   ignore = { },
   spellBookCache = { },
   oldSpellBookCache = { },
@@ -104,7 +140,7 @@ local LA = {
   spellsUnlearned = { },
   flyoutCache = { },
   numSpells = 0,
-  companionsReady = false,
+  -- PANDARIA -- companionsReady = false,
   backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -414,6 +450,7 @@ function LA:Init()
                   self:AddButton(BOOKTYPE_SPELL, tonumber(val))
                 end
               },
+              --[[ PANDARIA
               mount = {
                 type = "input",
                 name = "Mount",
@@ -429,7 +466,7 @@ function LA:Init()
                 set = function(info, val)
                   self:AddButton("CRITTER", tonumber(val))
                 end
-              },
+              }, ]]
               all = {
                 name = "All",
                 desc = "The Kitchen Sink",
@@ -459,6 +496,7 @@ function LA:Init()
                   self:ClearButtonID(BOOKTYPE_SPELL, tonumber(val))
                 end
               },
+              --[[ PANDARIA
               mount = {
                 type = "input",
                 name = "Mount",
@@ -474,7 +512,7 @@ function LA:Init()
                 set = function(info, val)
                   self:ClearButtonID("CRITTER", tonumber(val))
                 end
-              },
+              }, ]]
               button = {
                 type = "input",
                 name = "Button",
@@ -512,6 +550,7 @@ function LA:Init()
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
   end)
+  --[[ PANDARIA
   hooksecurefunc("LearnPreviewTalents", function(pet)
     self:DebugPrint("LearnPreviewTalents", pet)
     if pet then
@@ -523,6 +562,7 @@ function LA:Init()
       self.state.learning = true
     end
   end)
+  ]]
   hooksecurefunc("SetCVar", function (cvar, value)
     if cvar == nil then cvar = "" end
     if value == nil then value = "" end
@@ -545,7 +585,7 @@ function LA:Init()
       --self.state.learning = true
       if self.pendingTalentCount == 0 then wipe(self.pendingTalents) end
       self:RegisterEvent("PLAYER_TALENT_UPDATE")
-      local id = (group or GetActiveTalentGroup()).."."..tab.."."..talent.."."..rank
+      local id = (group or GetActiveSpecGroup()).."."..tab.."."..talent.."."..rank
       if not self.pendingTalents[id] then
         self.pendingTalents[id] = true
         self.pendingTalentCount = self.pendingTalentCount + 1
@@ -561,8 +601,8 @@ function LA:Init()
   local baseEvents = {
     "ADDON_LOADED",
     "CHAT_MSG_SYSTEM",
-    "COMPANION_LEARNED",
-    "COMPANION_UPDATE",
+    -- PANDARIA -- "COMPANION_LEARNED",
+    -- PANDARIA -- "COMPANION_UPDATE",
     "PET_TALENT_UPDATE",
     "PLAYER_LEAVING_WORLD",
     "PLAYER_LEVEL_UP",
@@ -574,7 +614,7 @@ function LA:Init()
 --    "SPELLS_CHANGED", -- wait until PLAYER_LOGIN
     "UNIT_SPELLCAST_START",
     "UI_SCALE_CHANGED",
-    "UPDATE_BINDINGS",
+--    "UPDATE_BINDINGS", -- PANDARIA -- not needed because of companion/mount removal
     "VARIABLES_LOADED"
 --[[
     "CURRENT_SPELL_CAST_CHANGED",
@@ -589,7 +629,8 @@ function LA:Init()
   end
   
   --self:UpdateSpellBook()
-  self:UpdateCompanions()
+  --PANDARIA
+  --self:UpdateCompanions()
   self:DiffActionBars()
   self:SaveActionBars()
   if self.saved.filterSpam ~= LA.FILTER_SHOW_ALL then
@@ -736,7 +777,7 @@ function LA:ChatCommandIgnore(info, str)
     -- print ignore list to the chat frame
     for origin, t in pairs(self.ignore) do
       for globalID, v in pairs(t) do
-        print(self:GetText("title")..": ".. self:GetText("listIgnored", GetSpellLink(globalID)))
+        DEFAULT_CHAT_FRAME:AddMessage(self:GetText("title")..": ".. self:GetText("listIgnored", GetSpellLink(globalID)))
       end
     end
   else
@@ -824,12 +865,14 @@ function LA:ProcessQueue()
         else
           self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
         end
+      --[[ PANDARIA
       elseif item.kind == "CRITTER" or item.kind == "MOUNT" then
         if item.action == "LEARN" then
           self:AddCompanion(item.kind, item.id)
         else
           self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
-        end
+        end 
+      ]]
       elseif item.kind == "HIDE" then
         self:Hide()
       else
@@ -886,14 +929,14 @@ end
 
 
 function LA:OnShow()
-  self:RegisterEvent("COMPANION_UPDATE", "OnEvent")
+  -- PANDARIA -- self:RegisterEvent("COMPANION_UPDATE", "OnEvent")
   self:RegisterEvent("TRADE_SKILL_SHOW", "OnEvent")
   self:RegisterEvent("TRADE_SKILL_CLOSE", "OnEvent")
   self:RegisterEvent("SPELL_UPDATE_COOLDOWN", "OnEvent")
   self:RegisterEvent("CURRENT_SPELL_CAST_CHANGED", "OnEvent")
 end
 function LA:OnHide()
-  self:UnregisterEvent("COMPANION_UPDATE")
+  -- PANDARIA -- self:UnregisterEvent("COMPANION_UPDATE")
   self:UnregisterEvent("TRADE_SKILL_SHOW")
   self:UnregisterEvent("TRADE_SKILL_CLOSE")
   self:UnregisterEvent("SPELL_UPDATE_COOLDOWN")

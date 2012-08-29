@@ -1,4 +1,39 @@
--- Events.lua
+--[[
+
+Learning Aid version 1.12
+Compatible with World of Warcraft version 5.0.4
+Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Email: jamashkj@gmail.com
+
+Events.lua is part of Learning Aid.
+
+  Learning Aid is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version.
+
+  Learning Aid is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with Learning Aid.  If not, see
+  <http://www.gnu.org/licenses/>.
+
+To download the latest official version of Learning Aid, please visit 
+either Curse or WowInterface at one of the following URLs: 
+
+http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx
+
+http://www.wowinterface.com/downloads/info10622-LearningAid.html
+
+Other sites that host Learning Aid are not official and may contain 
+outdated or modified versions. If you have obtained Learning Aid from 
+any other source, I strongly encourage you to use Curse or WoWInterface 
+for updates in the future. 
+
+]]
 
 local addonName, private = ...
 local LA = private.LA
@@ -18,7 +53,7 @@ function LA:ACTIONBAR_SLOT_CHANGED(slot)
   
   if self.state.untalenting then
     -- something something on (slot)
-    local spec = GetActiveTalentGroup()
+    local spec = GetActiveSpecGroup()
     local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
     local oldID = self.character.actions[spec][slot]
     self:DebugPrint("Action Slot "..slot.." changed:",
@@ -75,6 +110,7 @@ function LA:CHAT_MSG_SYSTEM(message)
     end
   end
 end
+--[[ PANDARIA
 function LA:COMPANION_LEARNED()
   self.companionsReady = true
   self:DiffCompanions()
@@ -99,6 +135,7 @@ function LA:COMPANION_UPDATE()
 --    self:UpdateCompanions()
   end
 end
+]]
 function LA:CURRENT_SPELL_CAST_CHANGED()
   local frame = self.frame
   local buttons = self.buttons
@@ -163,9 +200,12 @@ function LA:PLAYER_TALENT_UPDATE()
 end
 function LA:SPELLS_CHANGED()
   self:UpgradeIgnoreList()
+  --PANDARIA
+  --[[
   if not self.companionsReady then
     self:UpdateCompanions()
   end
+  ]]
   if self.numSpells > 0 then
     if self:DiffSpellBook() > 0 then
       if self.pendingBuyCount > 0 then
@@ -271,10 +311,11 @@ end
 function LA:UI_SCALE_CHANGED(...)
   self:DebugPrint("UI Scale changed: ",...)
 end
+--[[ PANDARIA
 function LA:UPDATE_BINDINGS()
   self:UpdateCompanions()
   self:UnregisterEvent("UPDATE_BINDINGS")
-end
+end ]]
 function LA:VARIABLES_LOADED()
   if self.saved.x and self.saved.y then
     self.frame:ClearAllPoints()

@@ -1,3 +1,11 @@
+# 1.12
+
+Updated for WoW 5.0.4 (Pre-Mists of Pandaria patch)
+
+Removed support for mini-pets and mounts due to persistent bugs.
+If you want to see support for mini-pets and mounts return, please
+contact the author at jamash.kj@gmail.com.
+
 # 1.11
 
 Updated for WoW 4.0.1 (Pre-Cataclysm patch)

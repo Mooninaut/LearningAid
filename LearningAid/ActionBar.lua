@@ -1,4 +1,39 @@
--- ActionBar.lua
+--[[
+
+Learning Aid version 1.12
+Compatible with World of Warcraft version 5.0.4
+Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Email: jamashkj@gmail.com
+
+ActionBar.lua is part of Learning Aid.
+
+  Learning Aid is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version.
+
+  Learning Aid is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with Learning Aid.  If not, see
+  <http://www.gnu.org/licenses/>.
+
+To download the latest official version of Learning Aid, please visit 
+either Curse or WowInterface at one of the following URLs: 
+
+http://wow.curse.com/downloads/wow-addons/details/learningaid.aspx
+
+http://www.wowinterface.com/downloads/info10622-LearningAid.html
+
+Other sites that host Learning Aid are not official and may contain 
+outdated or modified versions. If you have obtained Learning Aid from 
+any other source, I strongly encourage you to use Curse or WoWInterface 
+for updates in the future. 
+
+]]
 
 local addonName, private = ...
 local LA = private.LA
@@ -69,7 +104,7 @@ function LA:MacroSpells(macroText)
   return spells
 end
 function LA:DiffActionBars()
-  local spec = GetActiveTalentGroup()
+  local spec = GetActiveSpecGroup()
   for slot = 1, 120 do
     local actionType = GetActionInfo(slot)
     -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
@@ -86,7 +121,7 @@ function LA:DiffActionBars()
   end
 end
 function LA:SaveActionBars()
-  local spec = GetActiveTalentGroup()
+  local spec = GetActiveSpecGroup()
   if self.character.actions == nil then self.character.actions = {} end
   if self.character.actions[spec] then
     wipe(self.character.actions[spec])
@@ -103,7 +138,7 @@ function LA:SaveActionBars()
 end
 function LA:FindMissingActions()
   if InCombatLockdown() then
-    print(self:GetText("title")..": "..self:GetText("errorInCombat"))
+    DEFAULT_CHAT_FRAME:AddMessage(self:GetText("title")..": "..self:GetText("errorInCombat"))
     return
   end
   local actions = {}
@@ -237,7 +272,7 @@ end
 
 function LA:RestoreAction(globalID)
   -- self.character.actions[spec][slot] = globalID
-  local spec = GetActiveTalentGroup()
+  local spec = GetActiveSpecGroup()
   if self.character.actions and self.character.actions[spec] then -- and self.character.actions[spec][globalID]
     for actionSlot, id in pairs(self.character.actions[spec]) do
       if id == globalID then
