@@ -61,10 +61,10 @@ function LA:CreateButton()
   end
   button.linkSpell = function (...) self:SpellButton_OnModifiedClick(...) end
   button.toggleIgnore = function(spellButton, mouseButton, down)
-    if spellButton.kind == BOOKTYPE_SPELL then
-      self:ToggleIgnore(self:SpellGlobalID(spellButton:GetID()))
+    -- MOP -- if spellButton.kind == BOOKTYPE_SPELL then
+      self:ToggleIgnore(spellButton:GetID())
       self:UpdateButton(spellButton)
-    end
+    -- MOP -- end
   end
   button.iconTexture = _G[name.."IconTexture"]
   button.cooldown = _G[name.."Cooldown"]
@@ -72,22 +72,26 @@ function LA:CreateButton()
   button.subSpellName = _G[name.."SubSpellName"]
   return button
 end
-function LA:AddButton(kind, id)
+function LA:AddButton(id)
+  --[[ MOP 
   if kind == BOOKTYPE_SPELL then
     if id > self.numSpells or id < 1 then
       self:DebugPrint("AddButton(): Invalid spell ID", id)
       return
     end
+  ]]
+--[[ MOP
   elseif kind == "MOUNT" or kind == "CRITTER" then
     if id < 1 or id > GetNumCompanions(kind) then
       self:DebugPrint("AddButton(): Invalid companion, type", kind, "ID", id)
       return
     end
-  end
+]]
+  --end
   local buttons = self.buttons
   local visible = self:GetVisible()
   for i = 1, visible do
-    if buttons[i].kind == kind and buttons[i]:GetID() == id then
+    if buttons[i]:GetID() == id then -- MOP -- buttons[i].kind == kind and
       return
     end
   end
@@ -103,44 +107,37 @@ function LA:AddButton(kind, id)
     button:Show()
   end
 
-  button.kind = kind
+  -- MOP -- button.kind = kind
   self:SetVisible(visible + 1)
   button:SetID(id)
   button:SetChecked(false)
   
-  if kind == BOOKTYPE_SPELL then
-    -- if id > 1 then
-    --   local name, subName = GetSpellBookItemName(id, kind)
-    --   local prevName, prevSubName = GetSpellBookItemName(id - 1, kind)
-      -- CATA -- if name == prevName then
-      --   self:DebugPrint("Found new rank of existing ability "..name.." "..prevRank)
-      --   self:ClearButtonID(kind, id - 1)
-      -- else
-      --   self:DebugPrint(name.." ~= "..prevName)
-      -- end
-    -- end
-    if IsSelectedSpellBookItem(id, kind) then
+  -- MOP -- if kind == BOOKTYPE_SPELL then
+    if IsSelectedSpellBookItem(GetSpellInfo(id)) then -- , kind
       button:SetChecked(true)
     end
+  --[[ MOP
   elseif kind == "MOUNT" or kind == "CRITTER" then
     -- button.Companion = name
     local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, id)
     if isSummoned then
       button:SetChecked(true)
     end
+
   else
     self:DebugPrint("AddButton(): Invalid button type "..kind)
   end
+  ]]
   self:UpdateButton(button)
   self:AutoSetMaxHeight()
   self.frame:Show()
 end
-function LA:ClearButtonID(kind, id)
+function LA:ClearButtonID(id) -- MOP -- kind, 
   local buttons = self.buttons
   local i = 1
   -- not using a for loop because self.visible may change during the loop execution
   while i <= self:GetVisible() do
-    if buttons[i].kind == kind and buttons[i]:GetID() == id then
+    if buttons[i]:GetID() == id then -- buttons[i].kind == kind and 
       self:DebugPrint("Clearing button "..i.." with ID "..buttons[i]:GetID())
       self:ClearButtonIndex(i)
     else
@@ -211,7 +208,7 @@ function LA:ClearButtonIndex(index)
     local nextButton = buttons[i + 1]
     button:SetID(nextButton:GetID())
     button:SetChecked(nextButton:GetChecked())
-    button.kind = nextButton.kind
+    --button.kind = nextButton.kind
     button.iconTexture:SetVertexColor(nextButton.iconTexture:GetVertexColor())
     local cooldown = button.cooldown
     local nextCooldown = nextButton.cooldown
@@ -274,9 +271,9 @@ function LA:UpdateButton(button)
     button:Enable()
   end
 
-  if button.kind == BOOKTYPE_SPELL then
+  -- MOP -- if button.kind == BOOKTYPE_SPELL then
 
-    local texture = GetSpellTexture(id, BOOKTYPE_SPELL);
+    local texture = GetSpellTexture(id);
 
     -- If no spell, hide everything and return
     if ( not texture or (strlen(texture) == 0) ) then
@@ -293,7 +290,7 @@ function LA:UpdateButton(button)
       return;
     end
 
-    local start, duration, enable = GetSpellCooldown(id, BOOKTYPE_SPELL)
+    local start, duration, enable = GetSpellCooldown(id)
     CooldownFrame_SetTimer(cooldown, start, duration, enable)
     cooldown.start = start
     cooldown.duration = duration
@@ -304,8 +301,8 @@ function LA:UpdateButton(button)
       iconTexture:SetVertexColor(0.4, 0.4, 0.4)
     end
 
-    local spellName, subSpellName = GetSpellBookItemName(id, BOOKTYPE_SPELL)
-    local globalID = select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
+    local spellName, subSpellName = GetSpellInfo(id)
+    -- MOP -- local globalID = select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 
     -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
     highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
@@ -313,7 +310,7 @@ function LA:UpdateButton(button)
 
     -- Set Secure Action Button attribute
     if not InCombatLockdown()then
-      button:SetAttribute("spell*", spellName)
+      button:SetAttribute("spell*", id) -- spellName
     end
 
     iconTexture:SetTexture(texture)
@@ -324,9 +321,10 @@ function LA:UpdateButton(button)
     else
       spellString:SetPoint("LEFT", button, "RIGHT", 4, 2)
     end
-    if self:IsIgnored(globalID) then
+    if self:IsIgnored(id) then -- globalID
       iconTexture:SetVertexColor(0.8, 0.1, 0.1) -- red color cribbed from Bartender4
     end
+  --[[ MOP
   elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
 
     -- Some companions have two names, the display name and the spell name
@@ -339,7 +337,7 @@ function LA:UpdateButton(button)
     if not InCombatLockdown() then
       button:SetAttribute("spell*", spellName)
     end
-  end
+  end ]]
   iconTexture:Show()
   spellString:Show()
   subSpellString:Show()
@@ -348,20 +346,22 @@ end
 -- Adapted from SpellBookFrame.lua
 function LA:SpellButton_OnDrag(button)
   local id = button:GetID()
-  if button.kind == BOOKTYPE_SPELL then
-    PickupSpellBookItem(id, button.kind)
+  -- MOP -- if button.kind == BOOKTYPE_SPELL then
+    PickupSpell(id) -- PickupSpellBookItem(id, button.kind)
+  --[[ MOP
   elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
     PickupCompanion(button.kind, id)
-  end
+  end ]]
 end
 -- Adapted from SpellBookFrame.lua
 function LA:SpellButton_OnEnter(button)
   --self:DebugPrint("Outer SpellButton_OnEnter")
   local id = button:GetID()
-  local kind = button.kind
+  -- MOP -- local kind = button.kind
   GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-  if kind == BOOKTYPE_SPELL then
-    if GameTooltip:SetSpellBookItem(id, BOOKTYPE_SPELL) then
+  -- MOP -- if kind == BOOKTYPE_SPELL then
+    --if GameTooltip:SetSpellBookItem(id, BOOKTYPE_SPELL) then
+    if GameTooltip:SetSpellByID(id) then
       button.UpdateTooltip = function (...)
         --self:DebugPrint("Inner SpellButton_OnEnter")
         self:SpellButton_OnEnter(...)
@@ -372,6 +372,7 @@ function LA:SpellButton_OnEnter(button)
     GameTooltip:AddLine("dummy")
     _G["GameTooltipTextLeft"..GameTooltip:NumLines()]:SetText(self:GetText("ctrlToIgnore"))
     GameTooltip:Show()
+  --[[ MOP
   elseif kind == "MOUNT" or kind == "CRITTER" then
     local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, id)
     if GameTooltip:SetHyperlink("spell:"..creatureSpellID) then
@@ -381,31 +382,32 @@ function LA:SpellButton_OnEnter(button)
     end
   else
     self:DebugPrint("Invalid button type in LearningAid:SpellButton_OnEnter: "..button.kind)
-  end
+  end ]]
 end
 -- Adapted from SpellBookFrame.lua
 function LA:SpellButton_UpdateSelection(button)
-  if button.kind == BOOKTYPE_SPELL then
+  -- MOP -- if button.kind == BOOKTYPE_SPELL then
     local id = button:GetID()
-    if IsSelectedSpellBookItem(id, BOOKTYPE_SPELL) then
+    if IsSelectedSpellBookItem(GetSpellInfo(id)) then -- id, BOOKTYPE_SPELL
       button:SetChecked("true")
     else
       button:SetChecked("false")
     end
-  end
+  -- MOP end
 end
 -- Adapted from SpellBookFrame.lua
 function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
   local id = spellButton:GetID()
   local spellName, subSpellName
+  --[[ MoP
   if spellButton.kind == BOOKTYPE_SPELL then
     if ( id > MAX_SPELLS ) then
       return;
-    end
+    end ]]
     if ( IsModifiedClick("CHATLINK") ) then
       if ( MacroFrame and MacroFrame:IsShown() ) then
-        spellName, subSpellName = GetSpellBookItemName(id, BOOKTYPE_SPELL)
-          if ( spellName and not IsPassiveSpell(id, BOOKTYPE_SPELL) ) then
+        spellName, subSpellName = GetSpellInfo(id)
+          if ( spellName and not IsPassiveSpell(id) ) then
             if ( subSpellName and (strlen(subSpellName) > 0) ) then
               ChatEdit_InsertLink(spellName.."("..subSpellName..")")
             else
@@ -414,7 +416,7 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
           end
         return;
       else
-        local spellLink = GetSpellLink(id, BOOKTYPE_SPELL)
+        local spellLink = GetSpellLink(id)
           if(spellLink) then
             ChatEdit_InsertLink(spellLink)
           end
@@ -422,9 +424,10 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
       end
     end
     if ( IsModifiedClick("PICKUPACTION") ) then
-      PickupSpell(id, BOOKTYPE_SPELL)
+      PickupSpell(id)
       return;
     end
+  --[[
   elseif spellButton.kind == "MOUNT" or spellButton.kind == "CRITTER" then
     local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(spellButton.kind, id)
     if ( IsModifiedClick("CHATLINK") ) then
@@ -438,7 +441,7 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
     elseif ( IsModifiedClick("PICKUPACTION") ) then
       self.SpellButton_OnDrag(spellButton)
     end
-  end
+  end ]]
 end
 function LA:SpellButton_OnHide(button)
   self:DebugPrint("Hiding button "..button.index)

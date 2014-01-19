@@ -69,18 +69,22 @@ function LA:ACTIONBAR_SLOT_CHANGED(slot)
     end
   end
 end
-
+function LA:ACTIVE_TALENT_GROUP_CHANGED(newSpec, oldSpec)
+  -- currently, newSpec and oldSpec can only take on the values 1 or 2
+  -- nothing to see here, just making an entry in the debug log
+  -- print("LA:ACTIVE_TALENT_GROUP_CHANGED:", ...)
+end
 function LA:CHAT_MSG_SYSTEM(message)
   -- note: pet spells, when learned, do not come as links
   -- player spells do come as links
   --local rank
   local spell
   local t
-  local str = string.match(message, self.patterns.learnSpell) or string.match(message, self.patterns.learnAbility)
+  local str = string.match(message, self.patterns.learnSpell) or string.match(message, self.patterns.learnAbility) or string.match(message, self.patterns.learnPassive)
   if str then
     t = self.spellsLearned
   else
-    str = string.match(message, self.patterns.unlearnSpell) 
+    str = string.match(message, self.patterns.unlearnSpell)
     if str then
       t = self.spellsUnlearned
     end
@@ -139,21 +143,31 @@ function LA:CURRENT_SPELL_CAST_CHANGED()
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
+    --if button.kind == BOOKTYPE_SPELL then
       self:SpellButton_UpdateSelection(button)
-    end
+    --end
   end
 end
-function LA:PET_TALENT_UPDATE()
+-- Changed in Mists, formerly provided just the tab number I think
+-- Now provides SpellID (yay!) and isGuildSpell (yay!)
+function LA:LEARNED_SPELL_IN_TAB(spellID, tabNum, isGuildSpell)
+  if isGuildSpell then
+    local bookID = FindSpellBookSlotBySpellID(spellID)
+    self:SpellBookInfo(bookID, self.origin.guild)
+  end
+end
+function LA:PET_TALENT_UPDATE() -- TODO MoP: Needed?
   self:PrintPending()
 --  self.petLearning = false
 end
 function LA:PLAYER_ENTERING_WORLD()
   self:RegisterEvent("SPELLS_CHANGED")
 end
+--[[ MOP
 function LA:PLAYER_GUILD_UPDATE()
   self:UpdateGuild()
 end
+]]
 -- when transitioning continents, instances, etc the spellbook may be in flux
 -- between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD
 function LA:PLAYER_LEAVING_WORLD() 
@@ -166,6 +180,7 @@ end
 function LA:PLAYER_LOGIN()
   self:UpdateSpellBook()
   self:RegisterEvent("SPELLS_CHANGED")
+  self:RegisterEvent("LEARNED_SPELL_IN_TAB")
 end
 function LA:PLAYER_LOGOUT()
   self:SaveActionBars()
@@ -220,12 +235,12 @@ function LA:SPELL_UPDATE_COOLDOWN()
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
+    --if button.kind == BOOKTYPE_SPELL then
       self:UpdateButton(button)
-    elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
-      local start, duration, enable = GetCompanionCooldown(button.kind, button:GetID())
-      CooldownFrame_SetTimer(button.cooldown, start, duration, enable);
-    end
+    --elseif button.kind == "MOUNT" or button.kind == "CRITTER" then
+    --  local start, duration, enable = GetCompanionCooldown(button.kind, button:GetID())
+    --  CooldownFrame_SetTimer(button.cooldown, start, duration, enable);
+    --end
   end
 end
 function LA:TRADE_SKILL_SHOW()
@@ -233,13 +248,13 @@ function LA:TRADE_SKILL_SHOW()
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
-    if button.kind == BOOKTYPE_SPELL then
-      if IsSelectedSpellBookItem(button:GetID(), button.kind) then
+    --if button.kind == BOOKTYPE_SPELL then
+      if IsSelectedSpellBookItem(GetSpellInfo(button:GetID())) then
         button:SetChecked(true)
       else
         button:SetChecked(false)
       end
-    end
+    --end
   end
 end
 LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW

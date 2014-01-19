@@ -29,7 +29,7 @@ http://www.wowinterface.com/downloads/info10622-LearningAid.html
 Other sites that host Learning Aid are not official and may contain 
 outdated or modified versions. If you have obtained Learning Aid from 
 any other source, I strongly encourage you to use Curse or WoWInterface 
-for updates in the future. 
+for updates in the future.
 
 ]]
 
@@ -46,12 +46,10 @@ function LA:SpellGlobalID(id)
   -- end
   return select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 end
-
 function LA:UnlinkSpell(link)
   local globalID, name = string.match(link, "Hspell:([^|]+)|h%[([^]]+)%]")
   return name, tonumber(globalID)
 end
-
 -- do not modify the return value of this method
 function LA:SpellInfo(globalID)
   local infoCache = self.spellInfoCache
@@ -67,7 +65,6 @@ function LA:SpellInfo(globalID)
 	end
   return infoCache[globalID]
 end
-
 -- do not modify the return value of this method
 -- caller must specify spellOrigin when this method is called for a spell not already in the cache
 function LA:SpellBookInfo(spellBookID, spellOrigin)
@@ -84,7 +81,6 @@ function LA:SpellBookInfo(spellBookID, spellOrigin)
   end
   return bookCache[spellGlobalID]
 end
-
 -- do not modify the return value of this method
 function LA:FlyoutInfo(flyoutID)
   local flyoutCache = self.flyoutCache
@@ -101,7 +97,6 @@ function LA:FlyoutInfo(flyoutID)
   end
   return flyoutCache[flyoutID]
 end
-
 function LA:UpdateSpellBook()
   local infoCache = self.spellInfoCache
   local bookCache = self.spellBookCache
@@ -159,6 +154,7 @@ function LA:UpdateSpellBook()
   self.numSpells = total
 end
 function LA:UpdateGuild()
+  --[[ MOP
   if IsInGuild() then
     local guildName = GetGuildInfo("player")
     if guildName and guildName:len() > 0 and self.character.guild ~= guildName then
@@ -171,51 +167,54 @@ function LA:UpdateGuild()
     self.character.guildSpells = nil
     return false
   end
+  ]]
 end
 -- true if spell is known, false if spell is not know, nil if not in a guild
+--[[ MOP
 function LA:GuildSpellKnown(globalID)
   return self:UpdateGuild() and (self.character.guildSpells[globalID] and true or false) or nil
 end
+]]
 -- if new is true, a spell has been added to the spellbook
 -- if new is false, an existing spell has been newly learned
-function LA:AddSpell(bookID, new)
+function LA:AddSpell(id, new)
   local action = "SHOW"
   if new then
     action = "LEARN"
   end
   if InCombatLockdown() then
-    table.insert(self.queue, { action = action, id = bookID, kind = BOOKTYPE_SPELL }) -- trash oh noes
+    table.insert(self.queue, { action = action, id = id}) -- trash oh noes
   else
     if new then
-      self:LearnSpell(BOOKTYPE_SPELL, bookID)
+      self:LearnSpell(id)
     end
-    local bookInfo = self:SpellBookInfo(bookID)
+    local info = self:SpellInfo(id)
+    local bookInfo = self:SpellBookInfo(FindSpellBookSlotBySpellID(id))
     if (not self.state.retalenting) and
-       (not bookInfo.info.passive) and
-       (not self:GuildSpellKnown(bookInfo.info.globalID))
+       (not info.passive) and
+       (not bookInfo.origin == self.origin.guild)
     then
       -- Display button with draggable spell icon
-      if bookInfo.origin == self.origin.guild then
-        self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
-        self.character.guildSpells[bookInfo.info.globalID] = true
-      else
-	    self:AddButton(BOOKTYPE_SPELL, bookID)
-      end
+      
+      --if bookInfo.origin == self.origin.guild then
+        --self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
+        --self.character.guildSpells[bookInfo.info.globalID] = true
+      --else
+	      self:AddButton(id)
+      --end
 	  
     end
   end
 end
-
 -- a spell has been removed from the spellbook
 function LA:RemoveSpell(id)
   if InCombatLockdown() then
-    table.insert(self.queue, { action = "FORGET", id = id, kind = BOOKTYPE_SPELL }) -- trash oh noes
+    table.insert(self.queue, { action = "FORGET", id = id }) -- trash oh noes
   else
-    self:ClearButtonID(BOOKTYPE_SPELL, id)
+    self:ClearButtonID(id)
     self:ForgetSpell(id)
   end
 end
-
 function LA:DiffSpellBook()
   -- swap caches
   self.oldSpellBookCache, self.spellBookCache = self.spellBookCache, self.oldSpellBookCache
@@ -226,10 +225,10 @@ function LA:DiffSpellBook()
   for newID, newItem in pairs(new) do -- look for things learned
     if newItem.known then
       if not old[newID] then -- spell added to spellbook
-        self:AddSpell(newItem.bookID, true)
+        self:AddSpell(newID, true)
         updated = updated + 1
       elseif not old[newID].known then -- spell changed from unkown to known
-        self:AddSpell(newItem.bookID)
+        self:AddSpell(newID)
         updated = updated + 1
       end
     end
@@ -237,25 +236,25 @@ function LA:DiffSpellBook()
   for oldID, oldItem in pairs(old) do -- look for things forgotten
     if oldItem.known then
       if not new[oldID] then
-        self:RemoveSpell(oldItem.bookID)
+        self:RemoveSpell(oldID)
         updated = updated + 1
       elseif not new[oldID].known then
-        self:DebugPrint("Warning: Spell "..oldItem.info.name.." with globalID "..oldID.." forgotten but not removed!")
+        self:DebugPrint("Spell "..oldItem.info.name.." with globalID "..oldID.." forgotten but not removed")
         updated = updated + 1
       end
     end
   end
   if updated > 1 then
-    self:DebugPrint("Warning: Multiple updates ("..updated..") in DiffSpellBook detected!")
+    self:DebugPrint("Multiple updates ("..updated..") in DiffSpellBook")
   end
   -- TODO: Detect flyout changes (right now the spell button can't handle flyouts)
   return updated
 end
-
 -- A new spellbook ID has been added, bumping existing spellbook IDs up by one
-function LA:LearnSpell(kind, bookID)
+function LA:LearnSpell(id)
   local frame = self.frame
   local buttons = self.buttons
+  --[[ MOP using global ids, don't need to munge book ids anymore, yay!
   for i = 1, self:GetVisible() do
     local button = buttons[i]
     local buttonID = button:GetID()
@@ -264,18 +263,19 @@ function LA:LearnSpell(kind, bookID)
       self:UpdateButton(button)
     end
   end
+  ]]
   local spec = GetActiveSpecGroup()
   if self.saved.restoreActions and
       (not self.state.retalenting) and
-      kind == BOOKTYPE_SPELL and
+      -- MOP -- kind == BOOKTYPE_SPELL and
       self.character.unlearned and
       self.character.unlearned[spec] then    
-    local globalID = self:SpellBookInfo(bookID).info.globalID
+    --local globalID = self:SpellBookInfo(bookID).info.globalID
     for slot, oldIDs in pairs(self.character.unlearned[spec]) do
       local actionType = GetActionInfo(slot) -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
       for oldID in pairs(oldIDs) do
-        if oldID == globalID and actionType == nil then
-          PickupSpellBookItem(bookID, BOOKTYPE_SPELL)
+        if oldID == id and actionType == nil then
+          PickupSpell(id)
           PlaceAction(slot)
           self.character.unlearned[spec][slot][oldID] = nil
         end
@@ -283,10 +283,9 @@ function LA:LearnSpell(kind, bookID)
     end
   end
 end
-
 -- An old spellbook ID has been deleted, shifting spellbook IDs down by one
 function LA:ForgetSpell(bookID)
-  local frame = self.frame
+  --[[local frame = self.frame
   local buttons = self.buttons
   for i = 1, self:GetVisible() do
     local button = buttons[i]
@@ -295,5 +294,5 @@ function LA:ForgetSpell(bookID)
       button:SetID(buttonID - 1)
       self:UpdateButton(button)
     end
-  end
+  end]]
 end

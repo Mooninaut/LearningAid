@@ -1,4 +1,17 @@
-### Learning Aid 1.13 / 2.0 Redesign Work ###
+### WoW 5.0.4 / Mists of Pandaria Changes ###
+
+The pet/mount UI has changed so much, and putting pets/mounts on action bars
+seems so antiquated when people have hundreds of pets and use addons to manage
+them, and pet/mount support in Learning Aid is so buggy that I have removed pet
+and mount support.
+
+API changes
+
+New event: PLAYER_SPECIALIZATION_CHANGED fires at the end of the spec swap process
+
+Event changed: LEARNED_SPELL_IN_TAB, global spell id (integer), tab (integer, index 1)
+
+### Learning Aid 1.12 / 2.0 Redesign Work ###
 
 Top down:
 
@@ -26,7 +39,6 @@ Top down:
         * Ignore for all characters
         * Ignore for this guild
         * Ignore for this character
-
 
 
 ### IN PROGRESS ###

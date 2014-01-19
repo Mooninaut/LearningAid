@@ -243,7 +243,7 @@ function LA:FindMissingActions()
   for globalID, spell in pairs(bookCache) do
     local spellName = spell.info.name
     spellNameLower = string.lower(spellName)
-    if spell.known and
+    if IsSpellKnown(globalID) and
       (not self:IsIgnored(globalID)) and
       (not actions[globalID]) and -- spell is not on any action bar
       (not spell.info.passive) and -- spell is not passive
@@ -264,7 +264,7 @@ function LA:FindMissingActions()
   end
   table.sort(results, function (a, b) return a.bookID < b.bookID end)
   for result = 1, #results do
-    self:AddButton(BOOKTYPE_SPELL, results[result].bookID)
+    self:AddButton(results[result].info.globalID)
   end
 end
 

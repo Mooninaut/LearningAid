@@ -50,8 +50,8 @@ private.noLog = { -- do not log calls to these functions even when call logging 
   ListJoin = true,
   SpellInfo = true,
   SpellBookInfo = true,
-  PLAYER_GUILD_UPDATE = true,
-  UpdateGuild = true,
+  -- MOP -- PLAYER_GUILD_UPDATE = true,
+  -- MOP -- UpdateGuild = true,
   -- PANDARIA -- COMPANION_UPDATE = true
 }
 
@@ -79,7 +79,9 @@ local LA = {
     unlearnSpell    = ERR_SPELL_UNLEARNED_S,
     petLearnAbility = ERR_PET_LEARN_ABILITY_S,
     petLearnSpell   = ERR_PET_LEARN_SPELL_S,
-    petUnlearnSpell = ERR_PET_SPELL_UNLEARNED_S
+    petUnlearnSpell = ERR_PET_SPELL_UNLEARNED_S,
+    -- MoP 5.0.4 pre-patch added "You have learned a new passive effect: %s"
+    learnPassive    = ERR_LEARN_PASSIVE_S
     -- add tradeskill learning stuff here
   },
   defaults = { -- default savedvariables contents
@@ -105,13 +107,15 @@ local LA = {
 	racialSpell = 20549, -- War Stomp (Tauren)
 	racialPassiveSpell = 20550, -- Endurance (Tauren)
 	ridingSpells = {
-		[33388] = true, -- apprentice (60% ground)
-		[33391] = true, -- journeyman (100% ground)
-		[34090] = true, -- expert (150% flying)
-		[34091] = true, -- artisan (280% flying)
-		[90265] = true, -- master (310% flying)
-		[90267] = true, -- old world
-		[54197] = true  -- northrend
+		[33388] = true, -- Apprentice (60% ground speed)
+		[33391] = true, -- Journeyman (100% ground speed)
+		[34090] = true, -- Expert (150% flying speed)
+		[34091] = true, -- Artisan (280% flying speed)
+		[90265] = true, -- Master (310% flying speed)
+		[90267] = true, -- Flight Master's License (EK, Kalimdor, Deepholm)
+		[54197] = true, -- Cold Weather Flying (Northrend)
+    [130487] = true,-- Cloud Serpent Riding
+    [115913] = true -- Wisdom of the Four Winds (Pandaria)
 	},
   origin = {
     profession = "profession",
@@ -319,7 +323,7 @@ function LA:Init()
         desc = self:GetText("resetPositionHelp"),
         type = "execute",
         func = "ResetFramePosition",
-        width = "full",
+        --width = "full",
         order = 4
       },
       missing = {
@@ -418,7 +422,8 @@ function LA:Init()
             get = function(info) return self.frame:GetFrameStrata() end,
             order = 1
           },
-          debug = {
+		  -- only display debugging options if debugging is enabled
+          debug = (private.debug == 1) and {
             name = self:GetText("debugOutput"),
             desc = self:GetText("debugOutputHelp"),
             values = { SET = "Assignment", GET = "Access", CALL = "Function Calls" },
@@ -427,7 +432,7 @@ function LA:Init()
             get = function(info, key) return self:Debug(key) end,
             width = "full",
             order = 99
-          }
+          } or nil
         }
       },
       test = {
@@ -599,6 +604,7 @@ function LA:Init()
   --self.saved.enabled = true
   --self:DebugPrint("OnEnable()")
   local baseEvents = {
+    "ACTIVE_TALENT_GROUP_CHANGED",
     "ADDON_LOADED",
     "CHAT_MSG_SYSTEM",
     -- PANDARIA -- "COMPANION_LEARNED",
@@ -608,7 +614,7 @@ function LA:Init()
     "PLAYER_LEVEL_UP",
     "PLAYER_LOGIN",
     "PLAYER_LOGOUT",
-    "PLAYER_GUILD_UPDATE",
+-- MOP --    "PLAYER_GUILD_UPDATE",
     "PLAYER_REGEN_DISABLED",
     "PLAYER_REGEN_ENABLED",
 --    "SPELLS_CHANGED", -- wait until PLAYER_LOGIN
@@ -666,6 +672,7 @@ function LA:spellSpamFilter(chatFrame, event, message, ...)
     ) and (
       string.match(message, patterns.learnSpell) or 
       string.match(message, patterns.learnAbility) or
+      string.match(message, patterns.learnPassive) or
       string.match(message, patterns.unlearnSpell)
 --    )
   ) or
@@ -715,11 +722,13 @@ function LA:SetDefaultSettings()
     end
   end
   self.saved.ignore[self.enClass] = self.saved.ignore[self.enClass] or { }
-  self.ignore.class = self.saved.ignore[self.enClass]
-  self.saved.ignore.profession = self.saved.ignore.profession or { }
+  self.saved.ignore.profession    = self.saved.ignore.profession or { }
+  self.saved.ignore.guild         = self.saved.ignore.guild or { }
+  self.saved.ignore.race          = self.saved.ignore.race or { }
+  self.ignore.class      = self.saved.ignore[self.enClass]
   self.ignore.profession = self.saved.ignore.profession
-  self.saved.ignore.guild = self.saved.ignore.guild or { }
-  self.ignore.guild = self.saved.ignore.guild
+  self.ignore.guild      = self.saved.ignore.guild
+  self.ignore.race       = self.saved.ignore.race
   -- update with new debug option format as of 1.11
   if self.saved.debug ~= nil then
     if self.saved.debug then
@@ -854,10 +863,10 @@ function LA:ProcessQueue()
     for index = 1, #queue do
       local item = queue[index]
       if item.action == "SHOW" then
-        self:AddButton(item.kind, item.id)
+        self:AddButton(item.id)
       elseif item.action == "CLEAR" then
-        self:ClearButtonID(item.kind, item.id)
-      elseif item.kind == BOOKTYPE_SPELL then
+        self:ClearButtonID(item.id)
+      -- elseif item.kind == BOOKTYPE_SPELL then
         if item.action == "LEARN" then
           self:AddSpell(item.id)
         elseif item.action == "FORGET" then
@@ -873,10 +882,10 @@ function LA:ProcessQueue()
           self:DebugPrint("ProcessQueue(): Invalid action type " .. item.action)
         end 
       ]]
-      elseif item.kind == "HIDE" then
+      elseif item.action == "HIDE" then
         self:Hide()
       else
-        self:DebugPrint("ProcessQueue(): Invalid entry type " .. item.kind)
+        self:DebugPrint("ProcessQueue(): Invalid entry type " .. item.action)
       end
     end
     wipe(self.queue)
@@ -895,7 +904,7 @@ function LA:FormatSpells(t)
   end)
   local str = ""
   for i, globalID in ipairs(sortIndex) do
-    str = str .. infoCache[globalID].link .. ", "
+    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. infoCache[globalID].link .. ", "
   end
   if #sortIndex > 0 then
     return string.sub(str, 1, -3) -- trim off final ", "
