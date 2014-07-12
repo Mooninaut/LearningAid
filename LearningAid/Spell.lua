@@ -50,7 +50,7 @@ function LA:RealSpellBookItemInfo(spellBookID, bookType)
   assert(spellBookID, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
   local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, bookType)
   local specSpellName, specSpellGlobalID = self:UnlinkSpell(GetSpellLink(spellGlobalID))
-  return spellStatus, specSpellGlobalID, specSpellName
+  return spellStatus, specSpellGlobalID, specSpellName, spellGlobalID
 end
 function LA:UnlinkSpell(link)
   assert(link, "LearningAid:UnlinkSpell(link): bad link")
@@ -80,7 +80,15 @@ function LA:SpellBookInfo(spellBookID, spellOrigin)
   local bookCache = self.spellBookCache
   -- Some spells morph based on spec. GetSpellBookItemInfo returns the spec-agnostic base spell ID
   -- GetSpellLink, on the other hand returns the spec-specific link
-  local spellStatus, spellGlobalID, spellName = self:RealSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
+  local spellStatus, specSpellGlobalID, specSpellName, spellGlobalID = self:RealSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
+  if spellOrigin and not bookCache[specSpellGlobalID] then
+    bookCache[specSpellGlobalID] = {
+      known = IsSpellKnown(specSpellGlobalID) and true or false, -- coerce to boolean
+      status = spellStatus,
+      bookID = spellBookID,
+      origin = spellOrigin,
+      info = self:SpellInfo(specSpellGlobalID) -- convenience reference
+    }
   if spellOrigin and not bookCache[spellGlobalID] then
     bookCache[spellGlobalID] = {
       known = IsSpellKnown(spellGlobalID) and true or false, -- coerce to boolean
@@ -90,7 +98,7 @@ function LA:SpellBookInfo(spellBookID, spellOrigin)
       info = self:SpellInfo(spellGlobalID) -- convenience reference
     }
   end
-  return bookCache[spellGlobalID]
+  return bookCache[specSpellGlobalID]
 end
 -- do not modify the return value of this method
 function LA:FlyoutInfo(flyoutID)
