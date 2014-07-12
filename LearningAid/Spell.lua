@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 Spell.lua is part of Learning Aid.
@@ -46,12 +46,20 @@ function LA:SpellGlobalID(id)
   -- end
   return select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 end
+function LA:RealSpellBookItemInfo(spellBookID, bookType)
+  assert(spellBookID, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
+  local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, bookType)
+  local specSpellName, specSpellGlobalID = self:UnlinkSpell(GetSpellLink(spellGlobalID))
+  return spellStatus, specSpellGlobalID, specSpellName
+end
 function LA:UnlinkSpell(link)
+  assert(link, "LearningAid:UnlinkSpell(link): bad link")
   local globalID, name = string.match(link, "Hspell:([^|]+)|h%[([^]]+)%]")
   return name, tonumber(globalID)
 end
 -- do not modify the return value of this method
 function LA:SpellInfo(globalID)
+  assert(globalID, "LearningAid:SpellInfo(globalID): bad globalID")
   local infoCache = self.spellInfoCache
   if not infoCache[globalID] then
 		local name, subName = GetSpellInfo(globalID)
@@ -68,8 +76,11 @@ end
 -- do not modify the return value of this method
 -- caller must specify spellOrigin when this method is called for a spell not already in the cache
 function LA:SpellBookInfo(spellBookID, spellOrigin)
+  assert(spellBookID)
   local bookCache = self.spellBookCache
-  local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
+  -- Some spells morph based on spec. GetSpellBookItemInfo returns the spec-agnostic base spell ID
+  -- GetSpellLink, on the other hand returns the spec-specific link
+  local spellStatus, spellGlobalID, spellName = self:RealSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
   if spellOrigin and not bookCache[spellGlobalID] then
     bookCache[spellGlobalID] = {
       known = IsSpellKnown(spellGlobalID) and true or false, -- coerce to boolean
@@ -121,7 +132,7 @@ function LA:UpdateSpellBook()
   for i = 1, GetNumSpellTabs() do
     local tabName, tabTexture, tabOffset, tabSpells, tabIsGuild = GetSpellTabInfo(i)
     for k = tabOffset + 1, tabOffset + tabSpells do
-      local spellStatus, spellGlobalID = GetSpellBookItemInfo(k, BOOKTYPE_SPELL)
+      local spellStatus, spellGlobalID = self:RealSpellBookItemInfo(k, BOOKTYPE_SPELL)
       if spellStatus == "FLYOUT" then
         -- flyout spells are not included in the regular spell tabs, they're in gaps between the index
 		-- one tab ends at and the index the next tab starts

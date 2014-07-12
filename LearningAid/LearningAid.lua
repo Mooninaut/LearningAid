@@ -1,8 +1,8 @@
 --[[
 
-Learning Aid version 1.12 ALPHA 1
+Learning Aid version 1.12 ALPHA 2
 Compatible with World of Warcraft version 5.0.4
-Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 LearningAid.lua is part of Learning Aid.
@@ -790,7 +790,7 @@ function LA:ChatCommandIgnore(info, str)
       end
     end
   else
-    local status, globalID = GetSpellBookItemInfo(str)
+    local status, globalID = self:RealSpellBookItemInfo(str)
     globalID = globalID or select(2, self:UnlinkSpell(str))
     if globalID then
       return self:Ignore(globalID)
@@ -798,7 +798,7 @@ function LA:ChatCommandIgnore(info, str)
   end
 end
 function LA:ChatCommandUnignore(info, str)
-  local status, globalID = GetSpellBookItemInfo(str:trim())
+  local status, globalID = self:RealSpellBookItemInfo(str:trim())
   globalID = globalID or select(2, self:UnlinkSpell(str))
   if globalID then
     self:Unignore(globalID)

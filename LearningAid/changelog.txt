@@ -1,3 +1,7 @@
+# 1.12a2
+
+Fixed the issue with spec-specific spells breaking /la search
+
 # 1.12a1
 
 Updated for WoW 5.0.4 (Pre-Mists of Pandaria patch)

@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 SpellButton.lua is part of Learning Aid.

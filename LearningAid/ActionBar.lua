@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2012 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 ActionBar.lua is part of Learning Aid.
@@ -50,6 +50,10 @@ LA.castSlashCommands = {
   [SLASH_CASTSEQUENCE1] = true,
   [SLASH_CASTSEQUENCE2] = true
 }
+-- macroText is the text of a macro from the official Macro UI or an addon
+-- returns a table of spells found in the macro of the form
+-- { "spellName1" = true, spellGlobalID1 = true, "spellName2" = true, spellGlobalID2 = true, ...}
+-- spell names are all lower case, global ids are integers
 function LA:MacroSpells(macroText)
   macroText = string.lower(macroText)
   local spells = {}
@@ -68,18 +72,15 @@ function LA:MacroSpells(macroText)
         while found do
           while found do
             found = false
-            -- ignore reset=
+            -- skip reset=
             lineFirst, lineLast = line:find("^reset=%S+%s*", linePos + 1)
             if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore macro options
+            -- skip macro options inside square brackets [ ]
             lineFirst, lineLast = line:find("^%[[^%]]*]", linePos + 1)
             if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore whitespace and punctuation
+            -- skip whitespace and delimiters
             lineFirst, lineLast = line:find("^[%s,;]+", linePos + 1)
             if lineLast ~= nil then linePos = lineLast; found = true end
-            -- ignore ranks
-            -- CATA -- lineFirst, lineLast = line:find("^%([^%)]+%)", linePos + 1)
-            -- CATA -- if lineLast ~= nil then linePos = lineLast; found = true end
           end
           found = false
           lineFirst, lineLast, token = line:find("^([^%[,;]+)", linePos + 1)
@@ -89,7 +90,7 @@ function LA:MacroSpells(macroText)
             found = true
             self:DebugPrint('Token: "'..token..'"')
             spells[token] = true
-            local status, globalID = GetSpellBookItemInfo(token)
+            local status, globalID = self:RealSpellBookItemInfo(token)
             if globalID then 
               spells[globalID] = true
             end
@@ -128,7 +129,7 @@ function LA:SaveActionBars()
   end
   local savedActions = self.character.actions[spec]
   for actionSlot = 1, 120 do
-    local actionType, actionID, actionSubType, globalID = GetActionInfo(actionSlot)
+    local actionType, globalID, actionSubType  = GetActionInfo(actionSlot)
     if actionType == "spell" then
       savedActions[actionSlot] = globalID
     end
