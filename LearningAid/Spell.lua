@@ -46,125 +46,144 @@ function LA:SpellGlobalID(id)
   -- end
   return select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 end
-function LA:RealSpellBookItemInfo(spellBookID, bookType)
-  assert(spellBookID, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
-  local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, bookType)
-  local specSpellName, specSpellGlobalID = self:UnlinkSpell(GetSpellLink(spellGlobalID))
-  return spellStatus, specSpellGlobalID, specSpellName, spellGlobalID
-end
+-- GetSpellLink(bookID, "spell") will return current spec link, which will fail when fed to IsSpellKnown and company
 function LA:UnlinkSpell(link)
-  assert(link, "LearningAid:UnlinkSpell(link): bad link")
+  assert(link, "LearningAid:UnlinkSpell(link): bad link", tostring(link))
   local globalID, name = string.match(link, "Hspell:([^|]+)|h%[([^]]+)%]")
   return name, tonumber(globalID)
 end
+function LA:RealSpellBookItemInfo(spellBookID, bookType)
+  -- returns status, globalID, spec-specific name, spec-specific globalID
+  if not bookType then bookType = BOOKTYPE_SPELL end
+  assert(spellBookID, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
+  local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, bookType)
+  return spellStatus, spellGlobalID, self:UnlinkSpell(GetSpellLink(spellBookID, bookType))
+  -- specSpellName, specSpellGlobalID
+end
 -- do not modify the return value of this method
 function LA:SpellInfo(globalID)
-  assert(globalID, "LearningAid:SpellInfo(globalID): bad globalID")
-  local infoCache = self.spellInfoCache
-  if not infoCache[globalID] then
+  --[[assert(globalID, "LearningAid:SpellInfo(globalID): bad globalID")
+  local spellCache = self.spellCache
+  spellCache[globalID] = spellCache[globalID] or { }
 		local name, subName = GetSpellInfo(globalID)
-		infoCache[globalID] = {
+		spellCache[globalID] = {
 			name = name,
 			subName = subName,
 			passive = IsPassiveSpell(globalID) and true or false, -- coerce to boolean
-			link = GetSpellLink(globalID),
-      globalID = globalID
+      globalID = globalID,
+      bookID = FindSpellBookSlotBySpellID(globalID)
 		}
 	end
   return infoCache[globalID]
+  ]]
 end
 -- do not modify the return value of this method
 -- caller must specify spellOrigin when this method is called for a spell not already in the cache
 function LA:SpellBookInfo(spellBookID, spellOrigin)
-  assert(spellBookID)
-  local bookCache = self.spellBookCache
+  --[[assert(spellBookID)
+  local spellCache = self.spellCache
   -- Some spells morph based on spec. GetSpellBookItemInfo returns the spec-agnostic base spell ID
   -- GetSpellLink, on the other hand returns the spec-specific link
-  local spellStatus, specSpellGlobalID, specSpellName, spellGlobalID = self:RealSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
-  if spellOrigin and not bookCache[specSpellGlobalID] then
-    bookCache[specSpellGlobalID] = {
-      known = IsSpellKnown(specSpellGlobalID) and true or false, -- coerce to boolean
-      status = spellStatus,
-      bookID = spellBookID,
-      origin = spellOrigin,
-      info = self:SpellInfo(specSpellGlobalID) -- convenience reference
-    }
-  if spellOrigin and not bookCache[spellGlobalID] then
-    bookCache[spellGlobalID] = {
-      known = IsSpellKnown(spellGlobalID) and true or false, -- coerce to boolean
-      status = spellStatus,
-      bookID = spellBookID,
-      origin = spellOrigin,
-      info = self:SpellInfo(spellGlobalID) -- convenience reference
+  local spellStatus, spellGlobalID, specSpellName, specSpellGlobalID = self:RealSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL)
+  local cacheEntry = spellCache[spellGlobalID]
+  if not cacheEntry then
+    cacheEntry = { }
+    spellCache[spellGlobalID] = cacheEntry
+  end
+  if spellOrigin and not cacheEntry.origin then cacheEntry.origin = spellOrigin end
+  if not cacheEntry.known then cacheEntry.known = IsSpellKnown(spellGlobalID) and true or false end -- coerce to boolean
+  cacheEntry.status = spellStatus
+  cacheEntry.bookID = spellBookID
+  cacheEntry.specName = specSpellName
+  cacheEntry.specGlobalID = specSpellGlobalID
+  cacheEntry.specLink = GetSpellLink(globalID) -- varies by player spec...should this be cached, then?
+      -- info = self:SpellInfo(spellGlobalID) -- convenience reference -- OBSOLETE
     }
   end
-  return bookCache[specSpellGlobalID]
+  return bookCache[spellGlobalID]
+  ]]
 end
 -- do not modify the return value of this method
+
+-- FIXME -- Work in progress -- FIXME -- 
 function LA:FlyoutInfo(flyoutID)
-  local flyoutCache = self.flyoutCache
+--  local flyoutCache = self.flyoutCache
   --local flyoutID = select(2, GetSpellBookItemInfo(spellBookID, BOOKTYPE_SPELL))
-  if not flyoutCache[flyoutID] then
+--  if not flyoutCache[flyoutID] then
     local flyoutName, flyoutDescription, numFlyoutSpells, flyoutKnown = GetFlyoutInfo(flyoutID)
-    flyoutCache[flyoutID] = {
+    --flyoutCache[flyoutID] = {
+    local info = {
       known = flyoutKnown,
       name = flyoutName,
       count = numFlyoutSpells,
       description = flyoutDescription--,
       --bookID = spellBookID
     }
-  end
-  return flyoutCache[flyoutID]
+  --end
+  --return flyoutCache[flyoutID]
+  return info
 end
+
 function LA:UpdateSpellBook()
-  local infoCache = self.spellInfoCache
-  local bookCache = self.spellBookCache
-  wipe(bookCache) -- trash generated oh noes
-  wipe(self.flyoutCache) -- trash generated oh noes
-  -- { Primary1, Primary2, Archaeology, Fishing, Cooking, First Aid }
+  --local infoCache = self.spellInfoCache
+  --local bookCache = self.spellBookCache
+  --wipe(bookCache) -- trash generated oh noes
+  --wipe(self.flyoutCache) -- trash generated oh noes
+  local known = self.knownSpells
   local total = 0
   local professions = { GetProfessions() }
+  -- { Primary1, Primary2, Archaeology, Fishing, Cooking, First Aid }
   local numKnown = 0
   for i = 1, self.numProfessions do
     if professions[i] then
       local name, texture, rank, maxRank, numSpells, spellOffset, skillLine, rankModifier = GetProfessionInfo(professions[i])
-      for k = spellOffset + 1, spellOffset + numSpells do
-         self:SpellBookInfo(k, self.origin.profession)
-         numKnown = numKnown + 1
-         total = total + 1
-      end
+      -- for k = spellOffset + 1, spellOffset + numSpells do
+         --self:SpellBookInfo(k, self.origin.profession)
+         numKnown = numKnown + numSpells -- 1
+         total = total + numSpells -- 1
+      -- end
     end
   end
-  local racial = self:SpellInfo(self.racialSpell).subName
-  local racialPassive = self:SpellInfo(self.racialPassiveSpell).subName
-  for i = 1, GetNumSpellTabs() do
-    local tabName, tabTexture, tabOffset, tabSpells, tabIsGuild = GetSpellTabInfo(i)
-    for k = tabOffset + 1, tabOffset + tabSpells do
-      local spellStatus, spellGlobalID = self:RealSpellBookItemInfo(k, BOOKTYPE_SPELL)
-      if spellStatus == "FLYOUT" then
-        -- flyout spells are not included in the regular spell tabs, they're in gaps between the index
-		-- one tab ends at and the index the next tab starts
-        local flyoutID = spellGlobalID
+  --local racial = self.Spell.GlobalID[self.racialSpell].SubName
+  --local racialPassive = self.Spell.GlobalID[self.racialPassiveSpell].SubName
+  -- tab 1 is general, tab 2 is current spec, tabs 3, 4 and possibly 5 if druid are not current spec, rest are professions...?
+  for tab = 1, 2 do -- GetNumSpellTabs()
+    local tabName, tabTexture, tabOffset, tabSpells, tabIsGuild, offspecID = GetSpellTabInfo(tab)
+    for slot = tabOffset + 1, tabOffset + tabSpells do
+      --print("Checking spell "..slot) -- DEBUG
+      local spell = self.Spell.BookID[slot]
+      local status, globalID, specName, specGlobalID = self:RealSpellBookItemInfo(slot, BOOKTYPE_SPELL)
+      if status == "FLYOUT" then
+        -- flyout spells are not included in the regular spell tabs, they're
+        -- in gaps between the last index of one tab and the first index of
+        -- the next tab
+        local flyoutID = globalID
         local flyoutInfo = self:FlyoutInfo(flyoutID)
-        for f = 1, flyoutInfo.count do
-          local flyoutSpellID, isKnown = GetFlyoutSlotInfo(flyoutID, f)
+        for flyoutSpell = 1, flyoutInfo.count do
+          local flyoutSpellID, flyoutSpellKnown = GetFlyoutSlotInfo(flyoutID, flyoutSpell)
           -- all flyout spells are class-based as of 4.1.0
           local bookID = FindSpellBookSlotBySpellID(flyoutSpellID)
-          if bookID then -- non-known flyout spells don't have book ids
-            self:SpellBookInfo(bookID, self.origin.class)
-            numKnown = numKnown + (isKnown and 1 or 0)
+          if bookID then -- future spells return nil
+            -- self:SpellBookInfo(bookID, self.origin.class)
+            numKnown = numKnown + (flyoutSpellKnown and 1 or 0)
             total = total + 1
           end
         end
-      else
-        local info = self:SpellInfo(spellGlobalID)
-        local bookInfo = self:SpellBookInfo(k,
+      elseif spell and spell.Known then
+        known[globalID] = slot
+        if specGlobalID ~= globalID then
+          known[specGlobalID] = slot
+          self.specSpellCache[specGlobalID] = globalID
+        end
+        --local info = self:SpellInfo(spellGlobalID)
+        --[[local bookInfo = self:SpellBookInfo(k,
           tabIsGuild and self.origin.guild or
           (info.subName == racial or info.subName == racialPassive) and self.origin.race or
           self.ridingSpells[spellGlobalID] and self.origin.riding or
           self.origin.class
         )
-        numKnown = numKnown + (bookInfo.known and 1 or 0)
+        ]]
+        numKnown = numKnown + 1
       end
       total = total + 1
     end
@@ -207,11 +226,10 @@ function LA:AddSpell(id, new)
     if new then
       self:LearnSpell(id)
     end
-    local info = self:SpellInfo(id)
     local bookInfo = self:SpellBookInfo(FindSpellBookSlotBySpellID(id))
     if (not self.state.retalenting) and
-       (not info.passive) and
-       (not bookInfo.origin == self.origin.guild)
+       (not self.Spell.GlobalID[id].Passive) --and
+       --(not bookInfo.origin == self.origin.guild)
     then
       -- Display button with draggable spell icon
       
@@ -236,30 +254,33 @@ function LA:RemoveSpell(id)
 end
 function LA:DiffSpellBook()
   -- swap caches
-  self.oldSpellBookCache, self.spellBookCache = self.spellBookCache, self.oldSpellBookCache
+  --self.oldSpellBookCache, self.spellBookCache = self.spellBookCache, self.oldSpellBookCache
+  self.oldKnownSpells, self.knownSpells = self.knownSpells, self.oldKnownSpells
   self:UpdateSpellBook()
-  local old = self.oldSpellBookCache
-  local new = self.spellBookCache
+  --local old = self.oldSpellBookCache
+  --local new = self.spellBookCache
+  local old = self.oldKnownSpells
+  local new = self.knownSpells
   local updated = 0
   for newID, newItem in pairs(new) do -- look for things learned
-    if newItem.known then
+    if newItem then
       if not old[newID] then -- spell added to spellbook
         self:AddSpell(newID, true)
         updated = updated + 1
-      elseif not old[newID].known then -- spell changed from unkown to known
-        self:AddSpell(newID)
-        updated = updated + 1
+      --elseif not old[newID].known then -- spell changed from unkown to known
+      --  self:AddSpell(newID)
+      --  updated = updated + 1
       end
     end
   end
   for oldID, oldItem in pairs(old) do -- look for things forgotten
-    if oldItem.known then
+    if oldItem then
       if not new[oldID] then
         self:RemoveSpell(oldID)
         updated = updated + 1
-      elseif not new[oldID].known then
-        self:DebugPrint("Spell "..oldItem.info.name.." with globalID "..oldID.." forgotten but not removed")
-        updated = updated + 1
+      --elseif not new[oldID].known then
+      --  self:DebugPrint("Spell "..oldItem.info.name.." with globalID "..oldID.." forgotten but not removed")
+      --  updated = updated + 1
       end
     end
   end

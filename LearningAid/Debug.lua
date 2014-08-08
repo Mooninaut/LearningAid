@@ -42,7 +42,7 @@ function LA:TestAdd(kind, ...)
   for i = 1, #t do
     local id = t[i]
     if kind == BOOKTYPE_SPELL then
-      if GetSpellInfo(id, kind) and not IsPassiveSpell(id, kind) then
+      if not IsPassiveSpell(id, kind) then
         print("Test: Adding button with spell id "..id)
         if InCombatLockdown() then
           table.insert(self.queue, { action = "SHOW", id = id, kind = kind })
@@ -167,7 +167,6 @@ function LA:Debug(flag, newValue)
     newDebug = 0
     private.debugFlags = debugFlags
     for savedFlag, savedValue in pairs(debugFlags) do
-      --debugFlags[savedFlag] = savedValue
       if savedValue then
         newDebug = newDebug + 1
       end
@@ -176,7 +175,7 @@ function LA:Debug(flag, newValue)
     return oldValue
   elseif newValue ~= oldValue then -- setter
     debugFlags[flag] = newValue
-    newDebug = newDebug + (newValue and 1 or -1)
+    newDebug = newDebug + (newValue and 1 or -1) -- increment if true, decrement if false
   end
 
   local shadow = private.shadow

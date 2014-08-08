@@ -93,7 +93,6 @@ function LA:CHAT_MSG_SYSTEM(message)
     local name, globalID = self:UnlinkSpell(str)
     self:DebugPrint("Matched "..name, globalID)
     t[globalID] = true
-    self:SpellInfo(globalID, name, str)
     --t.link[globalID] = str
   else
     str = string.match(message, self.patterns.petLearnAbility) or string.match(message, self.patterns.petLearnSpell)

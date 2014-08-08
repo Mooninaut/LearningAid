@@ -1,7 +1,7 @@
 --[[
 
 Learning Aid version 1.12 ALPHA 2
-Compatible with World of Warcraft version 5.0.4
+Compatible with World of Warcraft version 5.4.8
 Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
@@ -104,19 +104,19 @@ local LA = {
 --  petLearning = false,
   activatePrimarySpec = 63645, -- global spellID
   activateSecondarySpec = 63644, -- global spellID
-	racialSpell = 20549, -- War Stomp (Tauren)
-	racialPassiveSpell = 20550, -- Endurance (Tauren)
-	ridingSpells = {
-		[33388] = true, -- Apprentice (60% ground speed)
-		[33391] = true, -- Journeyman (100% ground speed)
-		[34090] = true, -- Expert (150% flying speed)
-		[34091] = true, -- Artisan (280% flying speed)
-		[90265] = true, -- Master (310% flying speed)
-		[90267] = true, -- Flight Master's License (EK, Kalimdor, Deepholm)
-		[54197] = true, -- Cold Weather Flying (Northrend)
-    [130487] = true,-- Cloud Serpent Riding
-    [115913] = true -- Wisdom of the Four Winds (Pandaria)
-	},
+  racialSpell = 20549, -- War Stomp (Tauren)
+  racialPassiveSpell = 20550, -- Endurance (Tauren)
+  ridingSpells = {
+    [33388] = true, -- Apprentice (60% ground speed)
+    [33391] = true, -- Journeyman (100% ground speed)
+    [34090] = true, -- Expert (150% flying speed)
+    [34091] = true, -- Artisan (280% flying speed)
+    [90265] = true, -- Master (310% flying speed)
+    [90267] = true, -- Flight Master's License (EK, Kalimdor, Deepholm)
+    [54197] = true, -- Cold Weather Flying (Northrend)
+    [115913] = true, -- Wisdom of the Four Winds (Pandaria)
+    [130487] = true-- Cloud Serpent Riding (Pandaria)
+  },
   origin = {
     profession = "profession",
     class = "class",
@@ -137,14 +137,19 @@ local LA = {
   },
   ]]
   ignore = { },
+  --[[ SPELL API
   spellBookCache = { },
   oldSpellBookCache = { },
   spellInfoCache = { },
+  ]]
   spellsLearned  = { },
   spellsUnlearned = { },
   flyoutCache = { },
   numSpells = 0,
-  -- PANDARIA -- companionsReady = false,
+  guildSpells = { },
+  knownSpells = { },
+  oldKnownSpells = { },
+  specSpellCache = { }, -- keys are spec-specific spell IDs, values are parent spell globalIDs
   backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -184,7 +189,9 @@ function LA:Init()
   self.tocVersion = select(4, GetBuildInfo())
   self.locale = GetLocale()
   self:SetDefaultSettings()
-
+  for i = 1, GetNumGuildPerks() do
+    self.guildSpells[select(2, GetGuildPerkInfo(i))] = true
+  end
   -- set up main frame
   local frame = self.frame
   frame:Hide()
@@ -422,7 +429,7 @@ function LA:Init()
             get = function(info) return self.frame:GetFrameStrata() end,
             order = 1
           },
-		  -- only display debugging options if debugging is enabled
+          -- only display debugging options if debugging is enabled
           debug = (private.debug == 1) and {
             name = self:GetText("debugOutput"),
             desc = self:GetText("debugOutputHelp"),
@@ -577,14 +584,14 @@ function LA:Init()
       self:AutoSetMaxHeight()
     end      
   end)
-  self.LearnTalent = LearnTalent
+  --self.LearnTalent = LearnTalent
   self.pendingTalents = {}
   self.pendingTalentCount = 0
-  LearnTalent = function(tab, talent, pet, group, ...)
+  hooksecurefunc("LearnTalent", function(tab, talent, pet, group, ...)
     self:DebugPrint("LearnTalent", tab, talent, pet, group, ...)
     local name, iconTexture, tier, column, rank, maxRank, isExceptional, meetsPrereq, unknown1, unknown2 = GetTalentInfo(tab, talent, false, pet, group)
     self:DebugPrint("GetTalentInfo", name, iconTexture, tier, column, rank, maxRank, isExceptional, meetsPrereq, unknown1, unknown2)
-    self.LearnTalent(tab, talent, pet, group, ...)
+    --self.LearnTalent(tab, talent, pet, group, ...)
     if rank < maxRank and meetsPrereq and not pet then
       --wipe(self.spellsLearned)
       --self.state.learning = true
@@ -597,7 +604,7 @@ function LA:Init()
       end
       --self:DebugPrint(GetTalentInfo(tab, talent, false, pet, group))
     end
-  end
+  end)
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
   --self:SetEnabledState(self.saved.enabled)
@@ -768,7 +775,8 @@ function LA:UpgradeIgnoreList()
   end
 end
 function LA:Ignore(globalID)
-  local bookItem = self.spellBookCache[globalID]
+  --local bookItem = self.spellBookCache[globalID]
+  local spell = self.Spell.GlobalID[globalID]
   if bookItem and self.ignore[bookItem.origin] and not bookItem.info.passive then
     if bookItem.origin == self.origin.profession then
       self.ignore[bookItem.origin][bookItem.info.name] = true
@@ -790,7 +798,7 @@ function LA:ChatCommandIgnore(info, str)
       end
     end
   else
-    local status, globalID = self:RealSpellBookItemInfo(str)
+    local status, globalID = GetSpellBookItemInfo(str, BOOKTYPE_SPELL)
     globalID = globalID or select(2, self:UnlinkSpell(str))
     if globalID then
       return self:Ignore(globalID)
@@ -798,34 +806,36 @@ function LA:ChatCommandIgnore(info, str)
   end
 end
 function LA:ChatCommandUnignore(info, str)
-  local status, globalID = self:RealSpellBookItemInfo(str:trim())
+  local status, globalID = GetSpellBookItemInfo(str:trim(), BOOKTYPE_SPELL)
   globalID = globalID or select(2, self:UnlinkSpell(str))
   if globalID then
     self:Unignore(globalID)
   end
 end
 function LA:Unignore(globalID)
-  local bookItem = self.spellBookCache[globalID]
-  if bookItem and self.ignore[bookItem.origin] then
-    if bookItem.origin == self.origin.profession then
-      self.ignore[bookItem.origin][bookItem.info.name] = nil
-    elseif self.ignore[bookItem.origin][globalID] then
-      self.ignore[bookItem.origin][globalID] = nil
-    end
+-- local spell = self.Spell.BookID[globalID]
+--  if bookItem and self.ignore[bookItem.origin] then
+--    if bookItem.origin == self.origin.profession then
+--      self.ignore[bookItem.origin][bookItem.info.name] = nil
+    self.ignore[globalID] = nil
+--    elseif self.ignore[bookItem.origin][globalID] then
+--      self.ignore[bookItem.origin][globalID] = nil
+--    end
     self:UpdateButtons()
-    return true
-  end
-  return false
+--    return true
+--  end
+--  return false
 end
 function LA:IsIgnored(globalID)
-  local bookItem = self.spellBookCache[globalID]
-  if bookItem and self.ignore[bookItem.origin] then
-    if bookItem.origin == self.origin.profession then
-      return self.ignore[bookItem.origin][bookItem.info.name]
-    else
-      return self.ignore[bookItem.origin][globalID]
-    end
-  end
+  --local bookItem = self.spellBookCache[globalID]
+  --if bookItem and self.ignore[bookItem.origin] then
+  --  if bookItem.origin == self.origin.profession then
+  --    return self.ignore[bookItem.origin][bookItem.info.name]
+  --  else
+  --    return self.ignore[bookItem.origin][globalID]
+  return self.ignore[globalID]
+  --  end
+  --end
 end
 function LA:ToggleIgnore(globalID)
   if self:IsIgnored(globalID) then
@@ -834,10 +844,11 @@ function LA:ToggleIgnore(globalID)
     self:Ignore(globalID)
   end
 end
-function LA:UnignoreAll(info)
-  for kind, list in pairs(self.ignore) do
-    wipe(list)
-  end
+function LA:UnignoreAll()
+  --for kind, list in pairs(self.ignore) do
+  --  wipe(list)
+  wipe(self.ignore)
+  --end
 end
 function LA:ResetFramePosition()
   local frame = self.frame
@@ -891,21 +902,24 @@ function LA:ProcessQueue()
     wipe(self.queue)
   end
 end
-
+local nameCache = { }
+local sortIndex = { }
 function LA:FormatSpells(t)
-  local infoCache = self.spellInfoCache
-  local sortIndex = { }
+  --local infoCache = self.spellInfoCache
   for globalID, change in pairs(t) do
     table.insert(sortIndex, globalID)
+    nameCache[globalID] = self.Spell.GlobalID[globalID].Name
   end
   table.sort(sortIndex, function(a,b)
     --self:DebugPrint("a = "..a..", b = "..b)
-    return infoCache[a].name < infoCache[b].name
+    return nameCache[a] < nameCache[b]
   end)
   local str = ""
   for i, globalID in ipairs(sortIndex) do
-    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. infoCache[globalID].link .. ", "
+    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. self.Spell.GlobalID[globalID].Link .. ", "
   end
+  wipe(sortIndex) -- avoid garbage
+  wipe(nameCache)
   if #sortIndex > 0 then
     return string.sub(str, 1, -3) -- trim off final ", "
   else

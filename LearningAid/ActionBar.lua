@@ -61,7 +61,7 @@ function LA:MacroSpells(macroText)
   first, last, line = macroText:find("([^\n]+)[\n]?")
   while first ~= nil do
     self:DebugPrint("Line",line)
-    local lineFirst, lineLast, slash = line:find("^(/%S+)%s+")
+    local lineFirst, lineLast, slash = line:find("^(/cast)%s+")
     if lineFirst ~= nil then
       self:DebugPrint('Slash "'..slash..'"')
       if self.castSlashCommands[slash] then
@@ -90,9 +90,16 @@ function LA:MacroSpells(macroText)
             found = true
             self:DebugPrint('Token: "'..token..'"')
             spells[token] = true
-            local status, globalID = self:RealSpellBookItemInfo(token)
-            if globalID then 
+            -- not self:GetRealSpellBookItemInfo because the extra info is not needed,
+            -- and <token> may contain strings like mount names that are not in the spellbook
+            local status, globalID = GetSpellBookItemInfo(token)
+            if globalID then
               spells[globalID] = true
+              local slot = FindSpellBookSlotBySpellID(globalID)
+              if slot then
+                -- handle spells that morph based on current spec
+                spells[select(2, self:UnlinkSpell(GetSpellLink(slot, BOOKTYPE_SPELL)))] = true
+              end
             end
           end
         end
@@ -129,7 +136,7 @@ function LA:SaveActionBars()
   end
   local savedActions = self.character.actions[spec]
   for actionSlot = 1, 120 do
-    local actionType, globalID, actionSubType  = GetActionInfo(actionSlot)
+    local actionType, globalID, actionSubType = GetActionInfo(actionSlot)
     if actionType == "spell" then
       savedActions[actionSlot] = globalID
     end
@@ -150,8 +157,8 @@ function LA:FindMissingActions()
   local macroSpells = {}
   local flyouts = {}
   local numTrackingTypes = GetNumTrackingTypes()
-  local bookCache = self.spellBookCache
-  local infoCache = self.spellInfoCache
+  --local bookCache = self.spellBookCache
+  --local infoCache = self.spellInfoCache
 
   --[[
   if not self.saved.tracking then
@@ -194,6 +201,10 @@ function LA:FindMissingActions()
     end
     if actionType == "spell" then
       actions[actionID] = true
+      if self.specSpellCache[actionID] then
+        self:DebugPrint("Found globalID for spell "..actionID..'='..self.specSpellCache[actionID])
+        actions[self.specSpellCache[actionID]] = true
+      end
     elseif actionType == "flyout" then
       -- flyoutID = actionID
       local name, description, size, flyoutKnown = GetFlyoutInfo(actionID)
@@ -241,13 +252,17 @@ function LA:FindMissingActions()
       shapeshift[globalID] = true
     end
   end
-  for globalID, spell in pairs(bookCache) do
-    local spellName = spell.info.name
-    spellNameLower = string.lower(spellName)
-    if IsSpellKnown(globalID) and
+  local _, _, start, count = GetSpellTabInfo(2) -- the current spec
+  for i = start + 1, start + count do
+    local spell = self.Spell.BookID[i]
+    assert(spell, "Spell "..i.." doesn't exist!")
+    local spellName = spell.Name
+    local spellNameLower = string.lower(spellName)
+    local globalID = spell.globalID
+    if spell.Known and
       (not self:IsIgnored(globalID)) and
       (not actions[globalID]) and -- spell is not on any action bar
-      (not spell.info.passive) and -- spell is not passive
+      (not spell.Passive) and -- spell is not passive
       -- spell is not a tracking spell, or displaying tracking spells has been enabled
       --(not tracking[spellName]) and
       (not shapeshift[globalID]) and
@@ -256,16 +271,16 @@ function LA:FindMissingActions()
       (not macroSpells[globalID])
     then
       -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      self:DebugPrint("Spell "..spellName.." is not on any action bar.")
+      self:DebugPrint("Spell "..globalID..' "'..spellName..'" is not on any action bar.')
       --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
       table.insert(results, spell)
-    elseif spell.status == "FLYOUT" and not flyouts[globalID] then
+    elseif spell.Status == "FLYOUT" and not flyouts[globalID] then
       -- ?
     end
   end
-  table.sort(results, function (a, b) return a.bookID < b.bookID end)
+  table.sort(results, function (a, b) return a.Slot < b.Slot end)
   for result = 1, #results do
-    self:AddButton(results[result].info.globalID)
+    self:AddButton(results[result].globalID)
   end
 end
 

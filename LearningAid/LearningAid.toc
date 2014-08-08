@@ -17,6 +17,7 @@ LearningAid.lua
 Debug.lua
 Events.lua
 SpellButton.lua
+SpellAPI.lua
 Spell.lua
 ActionBar.lua
 Trainer.lua
