@@ -1,6 +1,23 @@
+# 1.12a3
+
+Actually fixed the issue with spec-specific spells appearing in /la search
+results whether or not they were on an action bar, for reals this time.
+
+Added new object-oriented SpellAPI.lua, which may become an independent
+library at some point.
+
+Pulled out a lot of obsolete code that has succumbed to bitrot.
+There's still a lot left.
+
+Known Issue: If you change specs, all the spec-specific spells for the
+spec you didn't start the current game session in will appear. Probably
+not that difficult to fix, but it's late and I want to get something at
+least semi-functional out tonight.
+
 # 1.12a2
 
 Fixed the issue with spec-specific spells breaking /la search
+[Update: Did not actually fix the issue with spec-specific spells]
 
 # 1.12a1
 
