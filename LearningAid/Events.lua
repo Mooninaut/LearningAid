@@ -150,6 +150,9 @@ end
 -- Changed in Mists, formerly provided just the tab number I think
 -- Now provides SpellID (yay!) and isGuildSpell (yay!)
 function LA:LEARNED_SPELL_IN_TAB(spellID, tabNum, isGuildSpell)
+  -- DEBUG --
+  -- print("LearningAid: Learned spell #"..tostring(spellID).." in tab #"..tostring(tabNum)..(isGuildSpell and " (Guild)" or ""))
+  -- /DEBUG --
   if isGuildSpell then
     local bookID = FindSpellBookSlotBySpellID(spellID)
     self:SpellBookInfo(bookID, self.origin.guild)

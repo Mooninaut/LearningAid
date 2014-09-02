@@ -114,14 +114,17 @@ function LA:DiffActionBars()
   for slot = 1, 120 do
     local actionType = GetActionInfo(slot)
     -- local actionType, actionID, actionSubType, globalID = GetActionInfo(slot)
+    -- If this slot once held a spell
     if self.character.actions and 
        self.character.actions[spec] and
        self.character.actions[spec][slot] and
        not actionType
     then
-      if not self.character.unlearned then self.character.unlearned = {} end
-      if not self.character.unlearned[spec] then self.character.unlearned[spec] = {} end
-      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = {} end
+      -- Ensure self.character.unlearned[spec][slot] exists
+      if not self.character.unlearned then self.character.unlearned = { } end
+      if not self.character.unlearned[spec] then self.character.unlearned[spec] = { } end
+      if not self.character.unlearned[spec][slot] then self.character.unlearned[spec][slot] = { } end
+      -- Save the old unlearned spell info in the "unlearned" table for future restoration
       self.character.unlearned[spec][slot][self.character.actions[spec][slot]] = true
     end
   end
@@ -132,7 +135,7 @@ function LA:SaveActionBars()
   if self.character.actions[spec] then
     wipe(self.character.actions[spec])
   else
-    self.character.actions[spec] = {}
+    self.character.actions[spec] = { }
   end
   local savedActions = self.character.actions[spec]
   for actionSlot = 1, 120 do
@@ -207,14 +210,16 @@ function LA:FindMissingActions()
       end
     elseif actionType == "flyout" then
       -- flyoutID = actionID
-      local name, description, size, flyoutKnown = GetFlyoutInfo(actionID)
-      if flyoutKnown then
+      -- local name, description, size, flyoutKnown = GetFlyoutInfo(actionID)
+      local flyout = LearningAid.Spell.FlyoutID[actionID]
+      if flyout.Known then
         flyouts[actionID] = true
-        for flyoutSlot = 1, size do
-          local globalID, known = GetFlyoutSlotInfo(actionID, flyoutSlot)
-          if known then
+        for flyoutSlot = 1, flyout.Size do
+          --local globalID, known = GetFlyoutSlotInfo(actionID, flyoutSlot)
+          local flyoutSpell = flyout[flyoutSlot]
+          if flyoutSpell.Known then
             -- local spellBookID = FindSpellBookSlotBySpellID(globalID)
-            actions[globalID] = true
+            actions[flyoutSpell.ID] = true
           end
         end
       end
@@ -254,28 +259,30 @@ function LA:FindMissingActions()
   end
   local _, _, start, count = GetSpellTabInfo(2) -- the current spec
   for i = start + 1, start + count do
-    local spell = self.Spell.BookID[i]
+    local spell = self.Spell.Book[i]
     assert(spell, "Spell "..i.." doesn't exist!")
-    local spellName = spell.Name
-    local spellNameLower = string.lower(spellName)
-    local globalID = spell.globalID
-    if spell.Known and
-      (not self:IsIgnored(globalID)) and
-      (not actions[globalID]) and -- spell is not on any action bar
-      (not spell.Passive) and -- spell is not passive
-      -- spell is not a tracking spell, or displaying tracking spells has been enabled
-      --(not tracking[spellName]) and
-      (not shapeshift[globalID]) and
-      (not totem[globalID]) and
-      (not macroSpells[spellNameLower]) and
-      (not macroSpells[globalID])
-    then
+    if "SPELL" == spell.Status then
+      local spellName = spell.Name
+      local spellNameLower = string.lower(spellName)
+      local globalID = spell.ID
+      if spell.Known and
+        (not self:IsIgnored(globalID)) and
+        (not actions[globalID]) and -- spell is not on any action bar
+        (not spell.Passive) and -- spell is not passive
+        -- spell is not a tracking spell, or displaying tracking spells has been enabled
+        --(not tracking[spellName]) and
+        (not shapeshift[globalID]) and
+        (not totem[globalID]) and
+        (not macroSpells[spellNameLower]) and
+        (not macroSpells[globalID])
+      then
       -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
-      self:DebugPrint("Spell "..globalID..' "'..spellName..'" is not on any action bar.')
+        self:DebugPrint("Spell "..globalID..' "'..spellName..'" is not on any action bar.')
       --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
-      table.insert(results, spell)
-    elseif spell.Status == "FLYOUT" and not flyouts[globalID] then
-      -- ?
+        table.insert(results, spell)
+      end
+    elseif "FLYOUT" == spell.Status and not flyouts[globalID] then
+      print("you have not got "..spell.Name.." on your action bar bro")
     end
   end
   table.sort(results, function (a, b) return a.Slot < b.Slot end)
@@ -297,7 +304,7 @@ function LA:RestoreAction(globalID)
           local bookID
           if self.spellBookCache[globalID] then
             bookID = self.spellBookCache[globalID].bookID
-            self:DebugPrint("RestoreAction("..globalID.."): Found action at Spellbook ID "..bookID)
+            self:DebugPrint("RestoreAction("..globalID.."): Found action at Spellbook slot "..bookID)
             PickupSpell(bookID, BOOKTYPE_SPELL)
             PlaceAction(actionSlot)
           end

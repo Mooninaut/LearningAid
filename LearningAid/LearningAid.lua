@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid version 1.12 ALPHA 3
+Learning Aid version 1.12 ALPHA 4
 Compatible with World of Warcraft version 5.4.8
 Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
@@ -189,8 +189,13 @@ function LA:Init()
   self.tocVersion = select(4, GetBuildInfo())
   self.locale = GetLocale()
   self:SetDefaultSettings()
-  for i = 1, GetNumGuildPerks() do
-    self.guildSpells[select(2, GetGuildPerkInfo(i))] = true
+  --  Collect a list of guild perk spells so that LearningAid doesn't
+  -- spam them onscreen when they jump into and out of the spellbook,
+  -- which they have been known to do
+  --  The second return value of GetGuildPerkInfo is the global spellID
+  -- of the perk, as it appears in the spellbook
+  for perk = 1, GetNumGuildPerks() do
+    self.guildSpells[select(2, GetGuildPerkInfo(perk))] = perk
   end
   -- set up main frame
   local frame = self.frame
@@ -776,7 +781,7 @@ function LA:UpgradeIgnoreList()
 end
 function LA:Ignore(globalID)
   --local bookItem = self.spellBookCache[globalID]
-  local spell = self.Spell.GlobalID[globalID]
+  local spell = self.Spell.Global[globalID]
   if bookItem and self.ignore[bookItem.origin] and not bookItem.info.passive then
     if bookItem.origin == self.origin.profession then
       self.ignore[bookItem.origin][bookItem.info.name] = true
@@ -813,7 +818,7 @@ function LA:ChatCommandUnignore(info, str)
   end
 end
 function LA:Unignore(globalID)
--- local spell = self.Spell.BookID[globalID]
+-- local spell = self.Spell.Book[globalID]
 --  if bookItem and self.ignore[bookItem.origin] then
 --    if bookItem.origin == self.origin.profession then
 --      self.ignore[bookItem.origin][bookItem.info.name] = nil
@@ -908,7 +913,7 @@ function LA:FormatSpells(t)
   --local infoCache = self.spellInfoCache
   for globalID, change in pairs(t) do
     table.insert(sortIndex, globalID)
-    nameCache[globalID] = self.Spell.GlobalID[globalID].Name
+    nameCache[globalID] = self.Spell.Global[globalID].Name
   end
   table.sort(sortIndex, function(a,b)
     --self:DebugPrint("a = "..a..", b = "..b)
@@ -916,7 +921,7 @@ function LA:FormatSpells(t)
   end)
   local str = ""
   for i, globalID in ipairs(sortIndex) do
-    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. self.Spell.GlobalID[globalID].Link .. ", "
+    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. self.Spell.Global[globalID].Link .. ", "
   end
   wipe(sortIndex) -- avoid garbage
   wipe(nameCache)

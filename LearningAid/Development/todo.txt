@@ -1,3 +1,65 @@
+Bugs:
+"Asphyxiate", a talent override, has the wrong name, "Strangulate" in the LA popup.
+
+FIXME fix remaining instances of .globalID, .specID and .slot to ._gid, ._sid and ._slot respectively FIXME
+FIXME actually fix them to use .ID, .SpecID and .Slot FIXME
+
+Flyouts: Tricky cases
+Don't have flyout, do have all flyout spells
+  do nothing? show flyout?
+Don't have flyout, have some but not all spells
+  show flyout? show missing spells? show both?
+Don't have flyout, have no spells
+  show flyout? show spells? show both?
+Have flyout, have some but not all spells
+  show missing spells? / do nothing?
+
+Flyouts: Easy cases
+Have flyout, have no spells
+  do nothing
+Have flyout, have all spells
+  do nothing
+
+Should BookID[slot], GlobalID[gid] and FlyoutID[fid] cache their results?
+  Issue: Slot may change when the spellbook updates
+  Check for and update changed instances?
+  Wipe BookID and refresh each update? Won't generate garbage if the contents are still cached in GlobalID
+  Consequences of stale slot info:
+    ?
+
+How does this addon actually work?
+Login
+  
+Events
+  Learned_Spell_In_Tab
+  Spells_Changed
+  Swap spec
+User actions
+  /la search
+
+How *should* this addon work?
+
+Login
+  Build table of spells in book and spells on bars
+  If autosearch enabled, look for spells not on bars
+Events
+  Learned_Spell_In_Tab
+    Update spells in book
+    If autosearch enabled, see if spell is not on bar
+  Spells_Changed
+    Unnecessary?
+  Whatever the action bar item changed event is
+    Update spells on bars
+  Swap spec
+    Update spells in book
+    Update spells on bars
+    If autosearch enabled, look for spells not on bars
+User actions
+/la search
+  Check for spells not on bars and display them
+/la autosearch
+  Always display missing spells as soon as they are detected as missing
+
 ### WoW 5.0.4 / Mists of Pandaria Changes ###
 
 The pet/mount UI has changed so much, and putting pets/mounts on action bars

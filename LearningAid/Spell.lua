@@ -55,9 +55,12 @@ end
 function LA:RealSpellBookItemInfo(spellBookID, bookType)
   -- returns status, globalID, spec-specific name, spec-specific globalID
   if not bookType then bookType = BOOKTYPE_SPELL end
-  assert(spellBookID, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
+  assert(spellBookID and spellBookID > 0, "LearningAid:RealSpellBookItemInfo(spellBookID [, bookType]): bad spellBookID")
   local spellStatus, spellGlobalID = GetSpellBookItemInfo(spellBookID, bookType)
-  return spellStatus, spellGlobalID, self:UnlinkSpell(GetSpellLink(spellBookID, bookType))
+  if "SPELL" == spellStatus or "FUTURESPELL" == spellStatus then
+    return spellStatus, spellGlobalID, self:UnlinkSpell(GetSpellLink(spellBookID, bookType))
+  end
+  return spellStatus, spellGlobalID
   -- specSpellName, specSpellGlobalID
 end
 -- do not modify the return value of this method
@@ -127,9 +130,10 @@ end
 function LA:UpdateSpellBook()
   --local infoCache = self.spellInfoCache
   --local bookCache = self.spellBookCache
-  --wipe(bookCache) -- trash generated oh noes
-  --wipe(self.flyoutCache) -- trash generated oh noes
+  --wipe(bookCache)
+  wipe(self.flyoutCache)
   local known = self.knownSpells
+  wipe(known)
   local total = 0
   local professions = { GetProfessions() }
   -- { Primary1, Primary2, Archaeology, Fishing, Cooking, First Aid }
@@ -144,14 +148,15 @@ function LA:UpdateSpellBook()
       -- end
     end
   end
-  --local racial = self.Spell.GlobalID[self.racialSpell].SubName
-  --local racialPassive = self.Spell.GlobalID[self.racialPassiveSpell].SubName
+  --local racial = self.Spell.Global[self.racialSpell].SubName
+  --local racialPassive = self.Spell.Global[self.racialPassiveSpell].SubName
   -- tab 1 is general, tab 2 is current spec, tabs 3, 4 and possibly 5 if druid are not current spec, rest are professions...?
   for tab = 1, 2 do -- GetNumSpellTabs()
     local tabName, tabTexture, tabOffset, tabSpells, tabIsGuild, offspecID = GetSpellTabInfo(tab)
     for slot = tabOffset + 1, tabOffset + tabSpells do
       --print("Checking spell "..slot) -- DEBUG
-      local spell = self.Spell.BookID[slot]
+      local spell = self.Spell.Book[slot]
+      -- rawset(self.Spell.Book, slot, spell)
       local status, globalID, specName, specGlobalID = self:RealSpellBookItemInfo(slot, BOOKTYPE_SPELL)
       if status == "FLYOUT" then
         -- flyout spells are not included in the regular spell tabs, they're
@@ -159,6 +164,7 @@ function LA:UpdateSpellBook()
         -- the next tab
         local flyoutID = globalID
         local flyoutInfo = self:FlyoutInfo(flyoutID)
+        self.flyoutCache[flyoutID] = slot
         for flyoutSpell = 1, flyoutInfo.count do
           local flyoutSpellID, flyoutSpellKnown = GetFlyoutSlotInfo(flyoutID, flyoutSpell)
           -- all flyout spells are class-based as of 4.1.0
@@ -221,14 +227,15 @@ function LA:AddSpell(id, new)
     action = "LEARN"
   end
   if InCombatLockdown() then
-    table.insert(self.queue, { action = action, id = id}) -- trash oh noes
+    table.insert(self.queue, { action = action, id = id }) -- trash oh noes
   else
     if new then
       self:LearnSpell(id)
     end
-    local bookInfo = self:SpellBookInfo(FindSpellBookSlotBySpellID(id))
+    -- local bookInfo = self:SpellBookInfo(FindSpellBookSlotBySpellID(id))
+    local spell = self.Spell.Global[id]
     if (not self.state.retalenting) and
-       (not self.Spell.GlobalID[id].Passive) --and
+       (not spell.Passive) --and
        --(not bookInfo.origin == self.origin.guild)
     then
       -- Display button with draggable spell icon
@@ -237,7 +244,7 @@ function LA:AddSpell(id, new)
         --self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
         --self.character.guildSpells[bookInfo.info.globalID] = true
       --else
-	      self:AddButton(id)
+	      self:AddButton(spell.ID)
       --end
 	  
     end

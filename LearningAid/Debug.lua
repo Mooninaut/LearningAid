@@ -105,6 +105,15 @@ function private:DebugPrint(...)
   if p.debugCount > p.debugLimit then
     LearningAid_DebugLog[p.debugCount - p.debugLimit] = nil
   end
+  -- When there are <p.debugLimit> nils in the list, shift everything back down to start at 1
+  -- The next call to DebugPrint will set DebugLog[debugLimit + 1] and nil out DebugLog[1]
+  if (2*p.debugLimit) == p.debugCount then
+    for i = 1, p.debugLimit do
+      LearningAid_DebugLog[i] = LearningAid_DebugLog[i + p.debugLimit]
+      LearningAid_DebugLog[i + p.debugLimit] = nil
+    end
+    p.debugCount = p.debugLimit
+  end
 end
 -- don't call the stub DebugPrint, call the real DebugPrint
 private.wrappers.DebugPrint = private.DebugPrint
@@ -144,8 +153,10 @@ local function tset(t, ...)
 end
 -- call after original LA is in private.LA and LA is empty
 function private:Wrap(name, f)
+  self.tokenCount[name] = self.tokenCount[name] or 0
+  
   self.wrappers[name] = self.wrappers[name] or function(...)
-	  self.tokenCount[name] = (self.tokenCount[name] or 0) + 1
+	  self.tokenCount[name] = self.tokenCount[name] + 1
 	  local count = self.tokenCount[name]
 		self:DebugPrint(name.."["..count.."]("..LA:ListJoin(select(2,...))..")")
 		tset(junk, f(...))
