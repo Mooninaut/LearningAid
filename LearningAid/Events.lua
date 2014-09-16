@@ -111,32 +111,6 @@ function LA:CHAT_MSG_SYSTEM(message)
     end
   end
 end
---[[ PANDARIA
-function LA:COMPANION_LEARNED()
-  self.companionsReady = true
-  self:DiffCompanions()
-end
-function LA:COMPANION_UPDATE()
-  if self.companionsReady then
-    local frame = self.frame
-    local buttons = self.buttons
-    for i = 1, self:GetVisible() do
-      local button = buttons[i]
-      local kind = button.kind
-      if kind == "MOUNT" or kind == "CRITTER" then
-        local creatureID, creatureName, creatureSpellID, icon, isSummoned = GetCompanionInfo(kind, button:GetID())
-        if isSummoned then
-          button:SetChecked(true)
-        else
-          button:SetChecked(false)
-        end
-      end
-    end
---  else
---    self:UpdateCompanions()
-  end
-end
-]]
 function LA:CURRENT_SPELL_CAST_CHANGED()
   local frame = self.frame
   local buttons = self.buttons
@@ -153,14 +127,12 @@ function LA:LEARNED_SPELL_IN_TAB(spellID, tabNum, isGuildSpell)
   -- DEBUG --
   -- print("LearningAid: Learned spell #"..tostring(spellID).." in tab #"..tostring(tabNum)..(isGuildSpell and " (Guild)" or ""))
   -- /DEBUG --
+  --[[
   if isGuildSpell then
     local bookID = FindSpellBookSlotBySpellID(spellID)
     self:SpellBookInfo(bookID, self.origin.guild)
   end
-end
-function LA:PET_TALENT_UPDATE() -- TODO MoP: Needed?
-  self:PrintPending()
---  self.petLearning = false
+  ]]
 end
 function LA:PLAYER_ENTERING_WORLD()
   self:RegisterEvent("SPELLS_CHANGED")
@@ -251,7 +223,7 @@ function LA:TRADE_SKILL_SHOW()
   for i = 1, self:GetVisible() do
     local button = buttons[i]
     --if button.kind == BOOKTYPE_SPELL then
-      if IsSelectedSpellBookItem(GetSpellInfo(button:GetID())) then
+      if button.item.Selected then
         button:SetChecked(true)
       else
         button:SetChecked(false)
@@ -263,11 +235,12 @@ LA.TRADE_SKILL_CLOSE = LA.TRADE_SKILL_SHOW
 
 function LA:UNIT_SPELLCAST_START(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
-    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    not self.state.retalenting
+    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) -- and
+    -- not self.state.retalenting
   then
     self:DebugPrint("Talent swap initiated")
-    self.state.retalenting = counter
+    -- print("Retalenting initiated!") -- DEBUG FIXME
+    self.state.retalenting = true
     --self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED", "OnEvent")
     self:RegisterEvent("UNIT_SPELLCAST_STOP", "OnEvent")
@@ -276,10 +249,11 @@ function LA:UNIT_SPELLCAST_START(unit, spellName, deprecated, counter, globalID)
 end
 function LA:UNIT_SPELLCAST_INTERRUPTED(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
-    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    counter == self.state.retalenting
+    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) -- and
+    -- counter == self.state.retalenting
   then
     self:DebugPrint("Talent swap canceled")
+    -- print("Retalenting canceled!") -- DEBUG FIXME
     self.state.retalenting = false
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:UnregisterEvent("UNIT_SPELLCAST_STOP")
@@ -290,10 +264,12 @@ LA.UNIT_SPELLCAST_FAILED_QUIET = LA.UNIT_SPELLCAST_INTERRUPTED
 
 function LA:UNIT_SPELLCAST_STOP(unit, spellName, deprecated, counter, globalID)
   if unit == "player" and
-    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) and
-    counter == self.state.retalenting
+    (globalID == self.activatePrimarySpec or globalID == self.activateSecondarySpec) -- and
+    -- counter == self.state.retalenting
   then
     self:DebugPrint("Talent swap completed")
+    -- print("Retalenting completed!") -- DEBUG FIXME
+    self:UpdateSpellBook() -- fixes bug: spec spells all pop up at end of retalenting process
     self.state.retalenting = false
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:UnregisterEvent("UNIT_SPELLCAST_STOP")

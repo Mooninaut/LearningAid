@@ -96,11 +96,13 @@ setmetatable(LA.Spell.Flyout, flyoutBookMeta)
 function globalMeta.__index (t, index)
   index = tonumber(index)
   assert(index > 0)
-  local gID = LA.specSpellCache[index] or index -- get base spell id
-  local sID = select(2, LA:UnlinkSpell(GetSpellLink(gID))) -- get spec spell id
-  local newSpell = { _gid = gID, _sid = index }
+  local gID = LA.specToGlobal[index] or index -- get base spell ID
+  local sID = LA.globalToSpec[index] or LA.globalToSpec[gID] or index -- get spec spell ID
+  --local sID = select(2, LA:UnlinkSpell(GetSpellLink(gID))) -- get spec spell id
+  local newSpell = { _gid = gID, _sid = sID }
   setmetatable(newSpell, spellMeta)
-  rawset(t, index, newSpell)
+  -- rawset(t, index, newSpell) -- Save this object for faster future retrieval
+  -- TODO -- Expiration mechanism for cached spell objects
   return newSpell
 end
 
@@ -114,7 +116,7 @@ function bookMeta.__index(t, index)
     local spell = LA.Spell.Global[gID]
     spell._slot = index -- Remember which Spellbook slot the spell is in
     -- rawset(t, index, spell) -- Save this object for faster future retrieval
-    -- TODO -- Expiration mechanism for cached spell objects when spec IDs change
+    -- TODO -- Expiration mechanism for cached spell objects
     return spell
   elseif "FLYOUT" == gType then
     return LA.Spell.Flyout[gID]
@@ -276,6 +278,9 @@ function flyoutMeta.Name(flyout)
 end
 function flyoutMeta.SubName(flyout)
   return ""
+end
+function flyoutMeta.Selected(flyout)
+  -- FIXME TODO activate when flyout is open -- FIXME TODO
 end
 function flyoutMeta.Known(flyout)
   --local name, description, size, flyoutKnown = GetFlyoutInfo(flyoutID)

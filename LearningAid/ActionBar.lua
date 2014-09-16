@@ -289,7 +289,7 @@ function LA:FindMissingActions()
         table.insert(results, spell)
       end
     elseif "FLYOUT" == spell.Status and not flyouts[spell.ID] then
-      print("you have not got "..spell.Name.." on your action bar bro") -- DEBUG FIXME DEBUG FIXME
+      -- print("you have not got "..spell.Name.." on your action bar bro") -- DEBUG FIXME DEBUG FIXME
       table.insert(results, spell)
     end
   end

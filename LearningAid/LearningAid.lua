@@ -149,7 +149,8 @@ local LA = {
   guildSpells = { },
   knownSpells = { },
   oldKnownSpells = { },
-  specSpellCache = { }, -- keys are spec-specific spell IDs, values are parent spell globalIDs
+  specToGlobal = { }, -- keys are spec spell IDs, values are global spell IDs
+  globalToSpec = { }, -- keys are global spell IDs, values are spec spell IDs
   backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -532,7 +533,7 @@ function LA:Init()
     --self.spellsUnlearned = {}
     self:RegisterEvent("ACTIONBAR_SLOT_CHANGED", "OnEvent")
     self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnEvent")
-    self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
+    -- self:RegisterEvent("UI_ERROR_MESSAGE", "OnEvent")
   end)
   --[[ PANDARIA
   hooksecurefunc("LearnPreviewTalents", function(pet)
@@ -852,7 +853,7 @@ function LA:ProcessQueue()
     for index = 1, #queue do
       local item = queue[index]
       if item.action == "SHOW" then
-        self:AddButton(item.id)
+        self:AddButton(self.Spell.Global[item.id])
       elseif item.action == "CLEAR" then
         self:ClearButtonID(item.id)
       -- elseif item.kind == BOOKTYPE_SPELL then

@@ -179,7 +179,8 @@ function LA:UpdateSpellBook()
         known[globalID] = slot
         if specGlobalID ~= globalID then
           --known[specGlobalID] = slot -- Causes problems when spec IDs change (Mangle in particular)
-          self.specSpellCache[specGlobalID] = globalID
+          self.specToGlobal[specGlobalID] = globalID
+          self.globalToSpec[globalID] = specGlobalID
         end
         --local info = self:SpellInfo(spellGlobalID)
         --[[local bookInfo = self:SpellBookInfo(k,
@@ -222,6 +223,9 @@ end
 -- if new is true, a spell has been added to the spellbook
 -- if new is false, an existing spell has been newly learned
 function LA:AddSpell(id, new)
+  --[[ if self.state.retalenting then -- DEBUG FIXME
+    print("AddSpell called during retalent!") -- DEBUG FIXME
+  end ]]-- DEBUG FIXME
   local action = "SHOW"
   if new then
     action = "LEARN"
@@ -260,6 +264,11 @@ function LA:RemoveSpell(id)
   end
 end
 function LA:DiffSpellBook()
+  -- print("Diffing spellbook!") -- DEBUG FIXME
+  if self.state.retalenting then
+    -- print("DiffSpellBook called during retalent!") -- DEBUG FIXME
+    return 0
+  end
   -- swap caches
   --self.oldSpellBookCache, self.spellBookCache = self.spellBookCache, self.oldSpellBookCache
   self.oldKnownSpells, self.knownSpells = self.knownSpells, self.oldKnownSpells
@@ -272,8 +281,9 @@ function LA:DiffSpellBook()
   for newID, newItem in pairs(new) do -- look for things learned
     if newItem then
       if not old[newID] then -- spell added to spellbook
-        self:AddSpell(newID, true)
         updated = updated + 1
+        
+        self:AddSpell(newID, true)
       --elseif not old[newID].known then -- spell changed from unkown to known
       --  self:AddSpell(newID)
       --  updated = updated + 1

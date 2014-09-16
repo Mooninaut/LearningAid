@@ -42,7 +42,7 @@ local function hideButton(spellButton, mouseButton, down)
 end
 local function linkSpell(spellButton, ...)
   if "SPELL" == spellButton.item.Status then
-    LA:SpellButton_OnModifiedClick(...)
+    LA:SpellButton_OnModifiedClick(spellButton, ...)
   end
 end
 local function toggleIgnore(spellButton, mouseButton, down)
@@ -59,6 +59,9 @@ local function toggleFlyout(spellButton, mouseButton, down)
   end
 end
 function LA:CreateButton()
+  --[[ if self.state.retalenting then -- DEBUG FIXME
+    print("CreateButton called during retalenting!") -- DEBUG FIXME
+  end ]]-- DEBUG FIXME
   local buttons = self.buttons
   local count = #buttons
   -- button global variable names start with "SpellButton" to work around an
@@ -82,11 +85,15 @@ function LA:CreateButton()
   button.iconTexture = _G[name.."IconTexture"]
   button.cooldown = _G[name.."Cooldown"]
   button.spellName = _G[name.."SpellName"]
-  button.subSpellName = _G[name.."SubSpellName"]
+  button.subSpellName = subSpellName
   return button
 end
 function LA:AddButton(item)
   assert(item)
+  --[[ if self.state.retalenting then -- DEBUG FIXME
+    print("AddButton called during retalenting!") -- DEBUG FIXME
+  end ]]-- DEBUG FIXME
+  -- print("AddButton: "..item.Name) -- DEBUG FIXME
   -- local thing = self.Spell.Global[id] -- could be spell or flyout
   local itemType = strlower(item.Status) -- SPELL or FLYOUT
   assert("spell" == itemType or "flyout" == itemType, "Attempt to add invalid item "..item.ID.." of type "..itemType)
@@ -299,7 +306,12 @@ function LA:UpdateButton(button)
     return;
   end
 
+  local spellName = item.Name
+  local subSpellName = item.SubName
+
   if "SPELL" == item.Status then
+    spellName = item.SpecName
+    subSpellName = item.SpecSubName
     local start, duration, enable = GetSpellCooldown(id)
     CooldownFrame_SetTimer(cooldown, start, duration, enable)
     cooldown.start = start
@@ -311,8 +323,7 @@ function LA:UpdateButton(button)
       iconTexture:SetVertexColor(0.4, 0.4, 0.4)
     end
   end
-  local spellName = item.Name
-  local subSpellName = item.SubName
+  
   -- MOP -- local globalID = select(2, GetSpellBookItemInfo(id, BOOKTYPE_SPELL))
 
   -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
@@ -326,9 +337,9 @@ function LA:UpdateButton(button)
   --end
 
   iconTexture:SetTexture(texture)
-  spellString:SetText(item.Name)
-  subSpellString:SetText(item.SubName)
-  if ( item.SubName ~= "" ) then
+  spellString:SetText(spellName)
+  subSpellString:SetText(spellSubName)
+  if ( spellSubName ~= "" ) then
     spellString:SetPoint("LEFT", button, "RIGHT", 4, 4)
   else
     spellString:SetPoint("LEFT", button, "RIGHT", 4, 2)
@@ -342,7 +353,9 @@ function LA:UpdateButton(button)
   --SpellButton_UpdateSelection(self)
 end
 function LA:SpellButton_OnDrag(button)
-  button.item:Pickup()
+  if not InCombatLockdown() then
+    button.item:Pickup()
+  end
 end
 function LA._SpellButton_OnEnter(button)
   LA:SpellButton_OnEnter(button)
