@@ -108,15 +108,18 @@ function LA:AddButton(item)
     self:DebugPrint("Changing button index "..(self:GetVisible() + 1).." from "..button.item.Status.." "..button.item.ID.." to "..item.Status.." "..item.ID)
     button:Show()
   end
+  
+  button.item = item
   button:SetAttribute("spell*", item.ID)
+  
   if "flyout" == itemType then
     button:SetAttribute("flyout*", item.ID)
     button:SetAttribute("type*", "toggleFlyout")
   else
     button:SetAttribute("type*", itemType)
   end
+  
   self:SetVisible(visible + 1)
-  button.item = item
   button:SetChecked(false)
   
   if "spell" == itemType and item.Selected then
@@ -330,7 +333,7 @@ function LA:UpdateButton(button)
   else
     spellString:SetPoint("LEFT", button, "RIGHT", 4, 2)
   end
-  if self:IsIgnored(id) then
+  if self:IsIgnored(item) then
     iconTexture:SetVertexColor(0.8, 0.1, 0.1) -- red color cribbed from Bartender4
   end
   iconTexture:Show()

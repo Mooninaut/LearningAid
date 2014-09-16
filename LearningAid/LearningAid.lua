@@ -107,15 +107,15 @@ local LA = {
   racialSpell = 20549, -- War Stomp (Tauren)
   racialPassiveSpell = 20550, -- Endurance (Tauren)
   ridingSpells = {
-    [33388] = true, -- Apprentice (60% ground speed)
-    [33391] = true, -- Journeyman (100% ground speed)
-    [34090] = true, -- Expert (150% flying speed)
-    [34091] = true, -- Artisan (280% flying speed)
-    [90265] = true, -- Master (310% flying speed)
-    [90267] = true, -- Flight Master's License (EK, Kalimdor, Deepholm)
-    [54197] = true, -- Cold Weather Flying (Northrend)
+    [33388] = true,  -- Apprentice (60% ground speed)
+    [33391] = true,  -- Journeyman (100% ground speed)
+    [34090] = true,  -- Expert (150% flying speed)
+    [34091] = true,  -- Artisan (280% flying speed)
+    [90265] = true,  -- Master (310% flying speed)
+    [90267] = true,  -- Flight Master's License (EK, Kalimdor, Deepholm)
+    [54197] = true,  -- Cold Weather Flying (Northrend)
     [115913] = true, -- Wisdom of the Four Winds (Pandaria)
-    [130487] = true-- Cloud Serpent Riding (Pandaria)
+    [130487] = true  -- Cloud Serpent Riding (Pandaria)
   },
   origin = {
     profession = "profession",
@@ -435,7 +435,7 @@ function LA:Init()
             order = 1
           },
           -- only display debugging options if debugging is enabled
-          debug = (private.debug == 1) and {
+          debug = {
             name = self:GetText("debugOutput"),
             desc = self:GetText("debugOutputHelp"),
             values = { SET = "Assignment", GET = "Access", CALL = "Function Calls" },
@@ -443,7 +443,8 @@ function LA:Init()
             set = function(info, key, val) self:Debug(key, val) end,
             get = function(info, key) return self:Debug(key) end,
             width = "full",
-            order = 99
+            order = 99,
+            guiHidden = (0 == private.debug)
           } or nil
         }
       },
@@ -745,11 +746,16 @@ function LA:UpgradeIgnoreList()
     end
   end
 end
-function LA:Ignore(globalID)
+function LA:Ignore(spell)
+  if "SPELL" == spell.status then
+    self.ignore[spell.ID] = true
+  end
+  -- FIXME FIXME FIXME -- do something with flyouts
+--[[
   --local bookItem = self.spellBookCache[globalID]
-  local spell = self.Spell.Global[globalID]
-  if bookItem and self.ignore[bookItem.origin] and not bookItem.info.passive then
-    if bookItem.origin == self.origin.profession then
+  --local spell = self.Spell.Global[globalID]
+  if spell and not spell.Passive then -- self.ignore[bookItem.origin] and
+    --if bookItem.origin == self.origin.profession then
       self.ignore[bookItem.origin][bookItem.info.name] = true
     else
       self.ignore[bookItem.origin][globalID] = true
@@ -758,6 +764,7 @@ function LA:Ignore(globalID)
     return true
   end
   return false
+  ]]
 end
 function LA:ChatCommandIgnore(info, str)
   str = strtrim(str)
@@ -770,25 +777,25 @@ function LA:ChatCommandIgnore(info, str)
     end
   else
     local status, globalID = GetSpellBookItemInfo(str, BOOKTYPE_SPELL)
-    globalID = globalID or select(2, self:UnlinkSpell(str))
-    if globalID then
-      return self:Ignore(globalID)
+    -- globalID = globalID or select(2, self:UnlinkSpell(str)) -- redundant
+    if "SPELL" == status then
+      return self:Ignore(self.Spell.Global[globalID])
     end
   end
 end
 function LA:ChatCommandUnignore(info, str)
   local status, globalID = GetSpellBookItemInfo(str:trim(), BOOKTYPE_SPELL)
-  globalID = globalID or select(2, self:UnlinkSpell(str))
-  if globalID then
-    self:Unignore(globalID)
+  -- globalID = globalID or select(2, self:UnlinkSpell(str))
+  if "SPELL" == status then
+    self:Unignore(self.Spell.Global[globalID])
   end
 end
-function LA:Unignore(globalID)
+function LA:Unignore(spell)
 -- local spell = self.Spell.Book[globalID]
 --  if bookItem and self.ignore[bookItem.origin] then
 --    if bookItem.origin == self.origin.profession then
 --      self.ignore[bookItem.origin][bookItem.info.name] = nil
-    self.ignore[globalID] = nil
+    self.ignore[spell.ID] = nil
 --    elseif self.ignore[bookItem.origin][globalID] then
 --      self.ignore[bookItem.origin][globalID] = nil
 --    end
@@ -797,22 +804,22 @@ function LA:Unignore(globalID)
 --  end
 --  return false
 end
-function LA:IsIgnored(globalID)
+function LA:IsIgnored(spell)
   --local bookItem = self.spellBookCache[globalID]
   --if bookItem and self.ignore[bookItem.origin] then
   --  if bookItem.origin == self.origin.profession then
   --    return self.ignore[bookItem.origin][bookItem.info.name]
   --  else
   --    return self.ignore[bookItem.origin][globalID]
-  return self.ignore[globalID]
+  return self.ignore[spell.ID]
   --  end
   --end
 end
-function LA:ToggleIgnore(globalID)
-  if self:IsIgnored(globalID) then
-    self:Unignore(globalID)
+function LA:ToggleIgnore(spell)
+  if self:IsIgnored(spell.ID) then
+    self:Unignore(spell.ID)
   else
-    self:Ignore(globalID)
+    self:Ignore(spell.ID)
   end
 end
 function LA:UnignoreAll()

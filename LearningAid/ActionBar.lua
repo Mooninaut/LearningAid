@@ -271,7 +271,7 @@ function LA:FindMissingActions()
       local globalID = spell.ID
       local specID = spell.SpecID
       if spell.Known and not (
-        self:IsIgnored(globalID) or
+        self:IsIgnored(spell) or
         spells[globalID] or
         spells[specID] or -- spell is on any action bar
         spell.Passive or

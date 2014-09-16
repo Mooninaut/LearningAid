@@ -1,6 +1,9 @@
 # 1.12a4
 
-
+Mangle is working.
+Flyouts are working.
+/la search is working.
+Ignore list is broken. Do not use.
 
 # 1.12a3
 
