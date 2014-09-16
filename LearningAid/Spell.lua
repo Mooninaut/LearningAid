@@ -178,7 +178,7 @@ function LA:UpdateSpellBook()
       elseif spell and spell.Known then
         known[globalID] = slot
         if specGlobalID ~= globalID then
-          known[specGlobalID] = slot
+          --known[specGlobalID] = slot -- Causes problems when spec IDs change (Mangle in particular)
           self.specSpellCache[specGlobalID] = globalID
         end
         --local info = self:SpellInfo(spellGlobalID)
@@ -244,7 +244,7 @@ function LA:AddSpell(id, new)
         --self:DebugPrint("Found Guild Spell",bookInfo.info.globalID,bookInfo.info.name,time())
         --self.character.guildSpells[bookInfo.info.globalID] = true
       --else
-	      self:AddButton(spell.ID)
+      self:AddButton(spell)
       --end
 	  
     end

@@ -61,7 +61,8 @@ function LA:MacroSpells(macroText)
   first, last, line = macroText:find("([^\n]+)[\n]?")
   while first ~= nil do
     self:DebugPrint("Line",line)
-    local lineFirst, lineLast, slash = line:find("^(/cast)%s+")
+    -- catch /cast, /castsequence, /castrandom
+    local lineFirst, lineLast, slash = line:find("^(/cast[sequncradom]*)%s+")
     if lineFirst ~= nil then
       self:DebugPrint('Slash "'..slash..'"')
       if self.castSlashCommands[slash] then
@@ -150,7 +151,7 @@ function LA:FindMissingActions()
     DEFAULT_CHAT_FRAME:AddMessage(self:GetText("title")..": "..self:GetText("errorInCombat"))
     return
   end
-  local actions = {}
+  local spells = {}
   local types = {}
   local subTypes = {}
   local tracking = {}
@@ -188,30 +189,33 @@ function LA:FindMissingActions()
   for slot = 1, 120 do
     local actionType, actionID, actionSubType = GetActionInfo(slot)
     if actionSubType == nil then
-      actionSubType = ""
+      actionSubType = "nil"
     end
     if actionType == nil then
-      actionType = ""
+      actionType = "nil"
     end
     -- development info
     if not types[actionType] then
-      self:DebugPrint("Type "..actionType)
+      self:DebugPrint("Type of "..slot.." = "..actionType)
       types[actionType] = true
     end
     if not subTypes[actionSubType] then
-      self:DebugPrint("Subtype "..actionSubType)
+      self:DebugPrint("Subtype of"..slot.." = "..actionSubType)
       subTypes[actionSubType] = true
     end
     if actionType == "spell" then
-      actions[actionID] = true
-      if self.specSpellCache[actionID] then
-        self:DebugPrint("Found globalID for spell "..actionID..'='..self.specSpellCache[actionID])
-        actions[self.specSpellCache[actionID]] = true
-      end
+      local spell = self.Spell.Global[actionID]
+      --self:DebugPrint("Found globalID for spell "..actionID..'='..self.specSpellCache[actionID])
+      local gID = spell.ID
+      local sID = spell.SpecID
+      self:DebugPrint(self.name..":FindMissingActions() found spell "..actionID.."/"..gID.." / "..sID)
+      spells[gID] = true
+      spells[sID] = true
+      
     elseif actionType == "flyout" then
       -- flyoutID = actionID
       -- local name, description, size, flyoutKnown = GetFlyoutInfo(actionID)
-      local flyout = LearningAid.Spell.FlyoutID[actionID]
+      local flyout = LearningAid.Spell.Flyout[actionID]
       if flyout.Known then
         flyouts[actionID] = true
         for flyoutSlot = 1, flyout.Size do
@@ -219,15 +223,15 @@ function LA:FindMissingActions()
           local flyoutSpell = flyout[flyoutSlot]
           if flyoutSpell.Known then
             -- local spellBookID = FindSpellBookSlotBySpellID(globalID)
-            actions[flyoutSpell.ID] = true
+            spells[flyoutSpell.ID] = true
           end
         end
       end
     elseif actionType == "macro" and actionID ~= 0 and self.saved.macros then
       self:DebugPrint("Macro in slot "..slot.." with ID "..actionID)
       local body = GetMacroBody(actionID)
-      local spells = self:MacroSpells(body)
-      for spell in pairs(spells) do
+      local foundSpells = self:MacroSpells(body)
+      for spell in pairs(foundSpells) do
         macroSpells[spell] = true
       end
     end
@@ -240,8 +244,8 @@ function LA:FindMissingActions()
       local storage = button[2]
       if (buttonType == "macro") and (storage == 0) then
         self:DebugPrint("Macaroon macro in slot", index)
-        local spells = self:MacroSpells(macroText)
-        for spell in pairs(spells) do
+        local foundSpells = self:MacroSpells(macroText)
+        for spell in pairs(foundSpells) do
           macroSpells[spell] = true
         end
       end
@@ -265,29 +269,33 @@ function LA:FindMissingActions()
       local spellName = spell.Name
       local spellNameLower = string.lower(spellName)
       local globalID = spell.ID
-      if spell.Known and
-        (not self:IsIgnored(globalID)) and
-        (not actions[globalID]) and -- spell is not on any action bar
-        (not spell.Passive) and -- spell is not passive
+      local specID = spell.SpecID
+      if spell.Known and not (
+        self:IsIgnored(globalID) or
+        spells[globalID] or
+        spells[specID] or -- spell is on any action bar
+        spell.Passive or
         -- spell is not a tracking spell, or displaying tracking spells has been enabled
         --(not tracking[spellName]) and
-        (not shapeshift[globalID]) and
-        (not totem[globalID]) and
-        (not macroSpells[spellNameLower]) and
-        (not macroSpells[globalID])
+        shapeshift[globalID] or
+        totem[globalID] or
+        macroSpells[spellNameLower] or
+        macroSpells[globalID]
+      )
       then
       -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
         self:DebugPrint("Spell "..globalID..' "'..spellName..'" is not on any action bar.')
       --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
         table.insert(results, spell)
       end
-    elseif "FLYOUT" == spell.Status and not flyouts[globalID] then
-      print("you have not got "..spell.Name.." on your action bar bro")
+    elseif "FLYOUT" == spell.Status and not flyouts[spell.ID] then
+      print("you have not got "..spell.Name.." on your action bar bro") -- DEBUG FIXME DEBUG FIXME
+      table.insert(results, spell)
     end
   end
   table.sort(results, function (a, b) return a.Slot < b.Slot end)
-  for result = 1, #results do
-    self:AddButton(results[result].globalID)
+  for index = 1, #results do
+    self:AddButton(results[index])
   end
 end
 

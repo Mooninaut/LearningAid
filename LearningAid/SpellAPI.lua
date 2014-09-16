@@ -71,12 +71,15 @@ local addonName, private = ...
 local LA = private.LA
 
 -- backend data
+
+-- spellMeta._method.Foo = true indicates that Foo will be called as spell:Foo() rather than spell.Foo
+
 private.API = { }
 local bookMeta = { }
 local globalMeta = { }
-local spellMeta = { _method = { "Pickup" = true } }
+local spellMeta = { _method = { Pickup = true } }
 local flyoutBookMeta = { }
-local flyoutMeta = { }
+local flyoutMeta = { _method = { Pickup = true } }
 
 -- Top level
 LA.Spell = {
@@ -111,7 +114,7 @@ function bookMeta.__index(t, index)
     local spell = LA.Spell.Global[gID]
     spell._slot = index -- Remember which Spellbook slot the spell is in
     -- rawset(t, index, spell) -- Save this object for faster future retrieval
-    -- TODO -- Expiration mechanism for cached spell objects
+    -- TODO -- Expiration mechanism for cached spell objects when spec IDs change
     return spell
   elseif "FLYOUT" == gType then
     return LA.Spell.Flyout[gID]
@@ -121,17 +124,18 @@ function bookMeta.__index(t, index)
 end
 
 -- Spell object instances
-function spellMeta.__index(t, index)
-  --if spellMeta[index] then
-    -- using rawget to avoid an infinite loop if _gid doesn't exist for some reason
-    LA:DebugPrint("SpellMeta "..index.."("..tostring(rawget(t, "_gid"))..")") 
-    assert(spellMeta[index], LA.name..": Invalid SpellAPI object method: "..tostring(index))
-    if spellMeta._method[index] then
-      return spellMeta[index] -- accessed as t:index()
-    else
-      return spellMeta[index](t) -- accessed as t.index
-    end
-  --end
+function spellMeta.__index(spell, index)
+  -- Use rawget to avoid an infinite loop if _gid doesn't exist for some reason
+  -- LA:DebugPrint("SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
+  assert(spellMeta[index], LA.name..": Invalid SpellAPI object method: "..tostring(index))
+  if spellMeta._method[index] then
+    LA:DebugPrint("SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
+    return spellMeta[index] -- return value will be called as a method, see spellMeta._method
+  else
+    local result = spellMeta[index](spell)
+    LA:DebugPrint(tostring(result).." = SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
+    return result -- simple return value
+  end
 end
 
 function spellMeta.__eq(spell1, spell2)
@@ -171,7 +175,7 @@ end
 function spellMeta.Status(spell)
   local slot = spell.Slot
   assert(spell.Slot, LA.name..": Spell #"..spell._gid.." slot unknown in Spell.Status.")
-  GetSpellBookItemInfo(slot, BOOKTYPE_SPELL)
+  return GetSpellBookItemInfo(slot, BOOKTYPE_SPELL)
 end
 function spellMeta.ID(spell)
   return spell._gid
@@ -179,8 +183,9 @@ end
 function spellMeta.Slot(spell)
   --local name = spell.Name
   --local infoName = spell.Info.name
-  local globalID = spell._gid
-  local oldSlot = spell._slot
+  globalID = spell._gid
+  -- use rawget because _slot might be nil, which would call metatable._slot as a method and fail
+  local oldSlot = rawget(spell, "_slot")
   local slot = FindSpellBookSlotBySpellID(globalID)
   if slot then
     if slot ~= oldSlot then
@@ -200,6 +205,9 @@ function spellMeta.Spec(spell)
 end
 function spellMeta.Class(spell)
   return select(2, IsSpellClassOrSpec(spell.Slot, BOOKTYPE_SPELL))
+end
+function spellMeta.Selected(spell)
+  return IsSelectedSpellBookItem(spell.Slot, BOOKTYPE_SPELL)
 end
 function spellMeta.Perk(spell)
   return LA.guildSpells[spell._gid]
@@ -227,7 +235,12 @@ end
 function flyoutMeta.__index(flyout, index)
   if "string" == type(index) then
     assert(flyoutMeta[index], index.." is not a known flyout method")
-    return flyoutMeta[index](flyout)
+    if flyoutMeta._method[index] then
+      LA:DebugPrint("FlyoutMeta "..index.."("..tostring(rawget(flyout, "_fid"))..")")
+      return flyoutMeta[index] -- return value will be called as a method, see flyoutMeta._method
+    else
+      return flyoutMeta[index](flyout)
+    end
   elseif "number" == type(index) then
     local globalID, isKnown = GetFlyoutSlotInfo(flyout._fid, index)
     if globalID then

@@ -464,26 +464,9 @@ function LA:Init()
                 name = "Spell",
                 pattern = "^%d+$",
                 set = function(info, val)
-                  self:AddButton(BOOKTYPE_SPELL, tonumber(val))
+                  self:AddButton(self.Spell.Book[tonumber(val)])
                 end
               },
-              --[[ PANDARIA
-              mount = {
-                type = "input",
-                name = "Mount",
-                pattern = "^%d+$",
-                set = function(info, val)
-                  self:AddButton("MOUNT", tonumber(val))
-                end
-              },
-              critter = {
-                type = "input",
-                name = "Critter (Minipet)",
-                pattern = "^%d+$",
-                set = function(info, val)
-                  self:AddButton("CRITTER", tonumber(val))
-                end
-              }, ]]
               all = {
                 name = "All",
                 desc = "The Kitchen Sink",
@@ -492,7 +475,7 @@ function LA:Init()
                   local i = 1
                   local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
                   while spellName do
-                    self:AddButton(BOOKTYPE_SPELL, i)
+                    self:AddButton(self.Spell.Book[i])
                     i = i + 1
                     spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
                   end
@@ -513,23 +496,6 @@ function LA:Init()
                   self:ClearButtonID(BOOKTYPE_SPELL, tonumber(val))
                 end
               },
-              --[[ PANDARIA
-              mount = {
-                type = "input",
-                name = "Mount",
-                pattern = "^%d+$",
-                set = function(info, val)
-                  self:ClearButtonID("MOUNT", tonumber(val))
-                end
-              },
-              critter = {
-                type = "input",
-                name = "Critter (Minipet)",
-                pattern = "^%d+$",
-                set = function(info, val)
-                  self:ClearButtonID("CRITTER", tonumber(val))
-                end
-              }, ]]
               button = {
                 type = "input",
                 name = "Button",

@@ -114,6 +114,8 @@ function private:DebugPrint(...)
     end
     p.debugCount = p.debugLimit
   end
+  -- allow inline use
+  return ...
 end
 -- don't call the stub DebugPrint, call the real DebugPrint
 private.wrappers.DebugPrint = private.DebugPrint
@@ -140,7 +142,9 @@ private.meta = {
   end
 }
 -- when debugging is enabled, calls to LA:DebugPrint will be diverted to private:DebugPrint
-function LA:DebugPrint() end
+function LA:DebugPrint(...)
+  return ...
+end
 
 --setmetatable(private.empty, private.meta)
 local junk = { }
