@@ -259,7 +259,6 @@ function LA:GetVisible()
   return self.visible
 end
 function LA:Hide()
-  local frame = self.frame
   if not InCombatLockdown() then
     for i = 1, self:GetVisible() do
       self.buttons[i]:SetChecked(false)
@@ -301,7 +300,7 @@ function LA:UpdateButton(button)
     SpellBook_ReleaseAutoCastShine(button.shine)
     button.shine = nil
     highlightTexture:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
-    button:SetChecked(0)
+    button:SetChecked(false)
     -- CATA -- normalTexture:SetVertexColor(1.0, 1.0, 1.0)
     return;
   end
@@ -375,16 +374,16 @@ end
 -- Adapted from SpellBookFrame.lua
 function LA:SpellButton_UpdateSelection(button)
   if IsSelectedSpellBookItem(button.item.Slot, "BOOKTYPE_SPELL") then
-    button:SetChecked("true")
+    button:SetChecked(true)
   else
-    button:SetChecked("false")
+    button:SetChecked(false)
   end
 end
--- Adapted from SpellBookFrame.lua
+-- Adapted from SpellBookFrame.lua and heavily modified
 function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
   local item = spellButton.item
-  local itemName = item.Name
-  itemSubName = item.SubName
+  local itemName = item.SpecName
+  itemSubName = item.SpecSubName
   if IsModifiedClick("CHATLINK") and "SPELL" == spellButton.item.Status then
     if MacroFrame and MacroFrame:IsShown() then
       if not item.Passive then
@@ -395,7 +394,7 @@ function LA:SpellButton_OnModifiedClick(spellButton, mouseButton)
         end
       end
     else
-      local link = item.Link
+      local link = item.SpecLink
       if link then
         ChatEdit_InsertLink(link)
       end

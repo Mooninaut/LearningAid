@@ -1,18 +1,22 @@
 Bugs:
-"Asphyxiate", a talent override, has the wrong name, "Strangulate" in the LA popup.
+Error when learning warlock talent grimoire of service (extra temp demons)
+  which brings up a button with the flyout
+  then unlearning the talent
+  then mousing over the button
 
-FIXME fix remaining instances of .globalID, .specID and .slot to ._gid, ._sid and ._slot respectively FIXME
-FIXME actually fix them to use .ID, .SpecID and .Slot FIXME
+FIXED, MUST VERIFY "Asphyxiate", a talent override, has the wrong name, "Strangulate" in the LA popup.
+
+FIXED fix remaining instances of .globalID, .specID and .slot to ._gid, ._sid and ._slot respectively
 
 Flyouts: Tricky cases
 Don't have flyout, do have all flyout spells
-  do nothing? show flyout?
+  *do nothing*? show flyout?
 Don't have flyout, have some but not all spells
-  show flyout? show missing spells? show both?
+  show flyout? show missing spells? *show both*?
 Don't have flyout, have no spells
-  show flyout? show spells? show both?
+  show flyout? show spells? *show both*?
 Have flyout, have some but not all spells
-  show missing spells? / do nothing?
+  show missing spells? / *do nothing*?
 
 Flyouts: Easy cases
 Have flyout, have no spells
@@ -25,7 +29,7 @@ Should BookID[slot], GlobalID[gid] and FlyoutID[fid] cache their results?
   Check for and update changed instances?
   Wipe BookID and refresh each update? Won't generate garbage if the contents are still cached in GlobalID
   Consequences of stale slot info:
-    ?
+    spell or flyout that was in slot and now either is not in any slot or is in different slot: bad
 
 How does this addon actually work?
 Login

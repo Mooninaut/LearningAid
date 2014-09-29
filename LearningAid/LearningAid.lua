@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid version 1.12 ALPHA 4
+Learning Aid version 1.12 ALPHA 5
 Compatible with World of Warcraft version 5.4.8
 Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
@@ -39,7 +39,8 @@ local addonName, private = ...
 
 private.debug = 0
 private.debugCount = 0
-private.debugLimit = 5000 -- how many lines of log to keep before deleting earliest line
+private.debugLimit = 10000 -- how many lines of log to keep before deleting earliest line
+private.logAllEvents = false
 private.shadow = { }
 private.wrappers = { }
 private.debugFlags = { }
@@ -48,8 +49,8 @@ private.noLog = { -- do not log calls to these functions even when call logging 
   GetVisible = true,
   GetText = true,
   ListJoin = true,
-  SpellInfo = true,
-  SpellBookInfo = true,
+  --SpellInfo = true,
+  --SpellBookInfo = true,
   -- MOP -- PLAYER_GUILD_UPDATE = true,
   -- MOP -- UpdateGuild = true,
   -- PANDARIA -- COMPANION_UPDATE = true
@@ -151,6 +152,7 @@ local LA = {
   oldKnownSpells = { },
   specToGlobal = { }, -- keys are spec spell IDs, values are global spell IDs
   globalToSpec = { }, -- keys are global spell IDs, values are spec spell IDs
+  nameToGlobal = { }, -- keys are spell names (lowercased), values are global spell IDs
   backdrop = {
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Gold-Border",
@@ -165,19 +167,15 @@ _G[addonName] = LA
 LibStub("AceConsole-3.0"):Embed(LA)
 
 function private.onEvent(frame, event, ...)
-  LA[event](LA, ...)
-end
-
-function private.onEventDebug(frame, event, ...)
-  if LA.events[event] then
+  LA:DebugPrint("EVENT", event, ...)
+  if LA[event] then
     LA[event](LA, ...)
-  else
-    LA:DebugPrint(event)
   end
 end
 
 LA.frame = CreateFrame("Frame", nil, UIParent)
 LA.frame:SetScript("OnEvent", private.onEvent)
+
 LA.frame:RegisterEvent("ADDON_LOADED")
 
 for name, pattern in pairs(LA.patterns) do
@@ -190,6 +188,10 @@ function LA:Init()
   self.tocVersion = select(4, GetBuildInfo())
   self.locale = GetLocale()
   self:SetDefaultSettings()
+  if private.logAllEvents then
+    self:Debug("CALL", true)
+    self.frame:RegisterAllEvents()
+  end
   --  Collect a list of guild perk spells so that LearningAid doesn't
   -- spam them onscreen when they jump into and out of the spellbook,
   -- which they have been known to do
@@ -560,6 +562,7 @@ function LA:Init()
   --self.LearnTalent = LearnTalent
   self.pendingTalents = {}
   self.pendingTalentCount = 0
+  --[[-- TODO FIXME Rewrite entire talent handling code FIXME TODO --
   hooksecurefunc("LearnTalent", function(tab, talent, pet, group, ...)
     self:DebugPrint("LearnTalent", tab, talent, pet, group, ...)
     local name, iconTexture, tier, column, rank, maxRank, isExceptional, meetsPrereq, unknown1, unknown2 = GetTalentInfo(tab, talent, false, pet, group)
@@ -578,6 +581,7 @@ function LA:Init()
       --self:DebugPrint(GetTalentInfo(tab, talent, false, pet, group))
     end
   end)
+  ]]-- TODO FIXME Rewrite entire talent handling code FIXME TODO --
   self:RegisterChatCommand("la", "AceSlashCommand")
   self:RegisterChatCommand("learningaid", "AceSlashCommand")
   --self:SetEnabledState(self.saved.enabled)
@@ -610,10 +614,13 @@ function LA:Init()
     "UNIT_SPELLCAST_SUCCEEDED"
 --]]
   }
-  for i, event in ipairs(baseEvents) do
-    self:RegisterEvent(event, "OnEvent")
-  end
-  
+  --if private.logAllEvents then
+  --  self.frame:RegisterAllEvents()
+  --else
+    for i, event in ipairs(baseEvents) do
+      self:RegisterEvent(event, "OnEvent")
+    end
+  --end
   --self:UpdateSpellBook()
   --PANDARIA
   --self:UpdateCompanions()
@@ -881,37 +888,58 @@ function LA:ProcessQueue()
     wipe(self.queue)
   end
 end
-local nameCache = { }
-local sortIndex = { }
 function LA:FormatSpells(t)
-  --local infoCache = self.spellInfoCache
-  for globalID, change in pairs(t) do
-    table.insert(sortIndex, globalID)
-    nameCache[globalID] = self.Spell.Global[globalID].Name
-  end
-  table.sort(sortIndex, function(a,b)
-    --self:DebugPrint("a = "..a..", b = "..b)
-    return nameCache[a] < nameCache[b]
-  end)
   local str = ""
-  for i, globalID in ipairs(sortIndex) do
-    str = str .. ("|T%s:0|t"):format(GetSpellTexture(globalID)) .. self.Spell.Global[globalID].Link .. ", "
+  for i, spell in ipairs(t) do
+    str = str .. ("|T%s:0|t"):format(spell.SpecTexture) .. spell.SpecLink .. ", "
   end
-  wipe(sortIndex) -- avoid garbage
-  wipe(nameCache)
-  if #sortIndex > 0 then
+  if #t > 0 then
     return string.sub(str, 1, -3) -- trim off final ", "
   else
     return nil
   end
 end
-
+local function spellCompare (a,b)
+  return a.SpecName < b.SpecName
+end
 function LA:PrintPending()
+  local learned = self.spellsLearned
+  local unlearned = self.spellsUnlearned
   if self.saved.filterSpam == self.FILTER_SUMMARIZE then
-    local learned = self:FormatSpells(self.spellsLearned)
-    local unlearned = self:FormatSpells(self.spellsUnlearned)
-    if unlearned then self:SystemPrint(self:GetText("youHaveUnlearned", unlearned)) end
-    if learned then self:SystemPrint(self:GetText("youHaveLearned", learned)) end
+    -- lots of work just to remove stuff that's unlearned and then immediately relearned
+    if #learned > 0 and #unlearned > 0 then
+      local spells = { }
+      local learnedDupes = { }
+      local unlearnedDupes = { }
+      local name
+      for index, spell in ipairs(learned) do
+        spells[spell.SpecName] = index
+      end
+      for index, spell in ipairs(unlearned) do
+        name = spell.SpecName
+        if spells[name] then
+          tinsert(learnedDupes, spells[name])
+          tinsert(unlearnedDupes, index) -- do not disturb the table while traversing it
+        end
+      end
+      table.sort(learnedDupes)
+      for i = #learnedDupes, 1, -1 do -- go backwards so later indices don't change when removing earlier elements
+        tremove(learned, learnedDupes[i])
+      end
+      table.sort(unlearnedDupes)
+      for i = #unlearnedDupes, 1, -1 do
+        tremove(unlearned, unlearnedDupes[i])
+      end
+      -- phew!
+    end
+    table.sort(learned, spellCompare)
+    table.sort(unlearned, spellCompare)
+    local learnedString = self:FormatSpells(learned)
+    self:DebugPrint("learned", learnedString)
+    local unlearnedString = self:FormatSpells(unlearned)
+    self:DebugPrint("unlearned", unlearnedString)
+    if unlearnedString then self:SystemPrint(self:GetText("youHaveUnlearned", unlearnedString)) end
+    if learnedString then self:SystemPrint(self:GetText("youHaveLearned", learnedString)) end
 
     if #self.petUnlearned > 0 then
       table.sort(self.petUnlearned)

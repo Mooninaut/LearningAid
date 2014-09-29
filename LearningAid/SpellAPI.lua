@@ -61,7 +61,7 @@ BookID is an object that instantiates a new Spell object whenever a
 nonexistent index is accessed
 BookID[n] -> bookIDMeta.__index (t, n) -> setmetatable({ globalID = g }, SpellMeta)
 
-Why look up the slot each time with FindSpellBookSlotBySpellID? Because
+Why look up the slot each time with SpellBookSlotBySpellID? Because
 slots change. It's easier to always use the globalID than try to
 track spellbook ID changes dynamically. I've tried.
 
@@ -72,14 +72,21 @@ local LA = private.LA
 
 -- backend data
 
--- spellMeta._method.Foo = true indicates that Foo will be called as spell:Foo() rather than spell.Foo
+-- Metatable._method.Foo = true indicates that Foo will be called as object:Foo() rather than object.Foo
 
-private.API = { }
 local bookMeta = { }
 local globalMeta = { }
 local spellMeta = { _method = { Pickup = true } }
 local flyoutBookMeta = { }
 local flyoutMeta = { _method = { Pickup = true } }
+
+-- Lua optimization: locals are faster than globals
+local SpellInfo = GetSpellInfo
+local SpellKnown = IsSpellKnown
+local SpellBookItemInfo = GetSpellBookItemInfo
+local SpellBookSlotBySpellID = FindSpellBookSlotBySpellID
+local SpellLink = GetSpellLink
+local SpellPassive = IsPassiveSpell
 
 -- Top level
 LA.Spell = {
@@ -98,7 +105,7 @@ function globalMeta.__index (t, index)
   assert(index > 0)
   local gID = LA.specToGlobal[index] or index -- get base spell ID
   local sID = LA.globalToSpec[index] or LA.globalToSpec[gID] or index -- get spec spell ID
-  --local sID = select(2, LA:UnlinkSpell(GetSpellLink(gID))) -- get spec spell id
+  --local sID = select(2, LA:UnlinkSpell(SpellLink(gID))) -- get spec spell id
   local newSpell = { _gid = gID, _sid = sID }
   setmetatable(newSpell, spellMeta)
   -- rawset(t, index, newSpell) -- Save this object for faster future retrieval
@@ -111,7 +118,7 @@ end
 function bookMeta.__index(t, index)
   index = tonumber(index)
   assert(index > 0)
-  local gType, gID = GetSpellBookItemInfo(index, BOOKTYPE_SPELL)
+  local gType, gID = SpellBookItemInfo(index, BOOKTYPE_SPELL)
   if "SPELL" == gType or "FUTURESPELL" == gType then
     local spell = LA.Spell.Global[gID]
     spell._slot = index -- Remember which Spellbook slot the spell is in
@@ -121,7 +128,7 @@ function bookMeta.__index(t, index)
   elseif "FLYOUT" == gType then
     return LA.Spell.Flyout[gID]
   else
-    assert(false, LA.name..": Type of spellbook slot #"..tostring(index).." ("..tostring(gType)..") is not known")
+    error("LearningAid.Spell.Book: Type of spellbook slot #"..tostring(index).." ("..tostring(gType)..") is not known", 2)
   end
 end
 
@@ -129,14 +136,18 @@ end
 function spellMeta.__index(spell, index)
   -- Use rawget to avoid an infinite loop if _gid doesn't exist for some reason
   -- LA:DebugPrint("SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
-  assert(spellMeta[index], LA.name..": Invalid SpellAPI object method: "..tostring(index))
+  if not spellMeta[index] then
+    error("SpellAPI: Invalid Spell object method '"..tostring(index).."'", 2)
+  end
   if spellMeta._method[index] then
-    LA:DebugPrint("SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
-    return spellMeta[index] -- return value will be called as a method, see spellMeta._method
+    -- return value will be called as a method, see spellMeta._method
+    LA:DebugPrint("SpellMeta "..index.."("..tostring(spell)..")")
+    return spellMeta[index]
   else
+    -- simple return value
     local result = spellMeta[index](spell)
-    LA:DebugPrint(tostring(result).." = SpellMeta "..index.."("..tostring(rawget(spell, "_gid"))..")")
-    return result -- simple return value
+    LA:DebugPrint(tostring(result).." = SpellMeta "..tostring(index).."("..tostring(spell)..")")
+    return result
   end
 end
 
@@ -144,40 +155,41 @@ function spellMeta.__eq(spell1, spell2)
   return spell1._gid == spell2._gid
 end
 function spellMeta.Name(spell)
-  return select(1, GetSpellInfo(spell._gid))
+  return select(1, SpellInfo(spell._gid))
 end
 function spellMeta.SpecName(spell)
-  return select(1, GetSpellInfo(spell._sid))
+  return select(1, SpellInfo(spell._sid))
 end
+
 function spellMeta.Info(spell)
   local info = { }
   info.name, info.rank, info.icon, info.powerCost, info.isFunnel, info.powerType, info.castingTime, info.minRange, info.maxRange =
-    GetSpellInfo(spell._gid)
+    SpellInfo(spell._gid)
   return info
 end
 function spellMeta.SpecInfo(spell)
   local info = { }
   info.name, info.rank, info.icon, info.powerCost, info.isFunnel, info.powerType, info.castingTime, info.minRange, info.maxRange =
-    GetSpellInfo(spell._sid)
+    SpellInfo(spell._sid)
   return info
 end
 function spellMeta.SubName(spell)
-  return select(2, GetSpellInfo(spell._gid))
+  return select(2, SpellInfo(spell._gid))
 end
 function spellMeta.SpecSubName(spell)
-  return select(2, GetSpellInfo(spell._sid))
+  return select(2, SpellInfo(spell._sid))
 end
 function spellMeta.SpecID(spell)
   return spell._sid
 end
 function spellMeta.Known(spell)
-  -- Only works on gid, not sid. IsSpellKnown(sid) will always return nil
-  return IsSpellKnown(spell._gid)
+  -- Only works on gid, not sid. SpellKnown(sid) will always return nil
+  return SpellKnown(spell._gid)
 end
 function spellMeta.Status(spell)
   local slot = spell.Slot
   assert(spell.Slot, LA.name..": Spell #"..spell._gid.." slot unknown in Spell.Status.")
-  return GetSpellBookItemInfo(slot, BOOKTYPE_SPELL)
+  return SpellBookItemInfo(slot, BOOKTYPE_SPELL)
 end
 function spellMeta.ID(spell)
   return spell._gid
@@ -188,7 +200,7 @@ function spellMeta.Slot(spell)
   globalID = spell._gid
   -- use rawget because _slot might be nil, which would call metatable._slot as a method and fail
   local oldSlot = rawget(spell, "_slot")
-  local slot = FindSpellBookSlotBySpellID(globalID)
+  local slot = SpellBookSlotBySpellID(globalID)
   if slot then
     if slot ~= oldSlot then
       -- tostring to guard against nil values
@@ -200,8 +212,13 @@ function spellMeta.Slot(spell)
   return oldSlot
 end
 function spellMeta.Link(spell)
-  return GetSpellLink(spell._gid)
+  return SpellLink(spell._gid) or ""
 end
+function spellMeta.SpecLink(spell)
+  return SpellLink(spell._sid) or ""
+end
+-- use spell link in debug printing statements
+spellMeta.__tostring = spellMeta.SpecLink
 function spellMeta.Spec(spell)
   return select(1, IsSpellClassOrSpec(spell.Slot, BOOKTYPE_SPELL))
 end
@@ -215,10 +232,17 @@ function spellMeta.Perk(spell)
   return LA.guildSpells[spell._gid]
 end
 function spellMeta.Passive(spell)
-  return IsPassiveSpell(spell._gid)
+  return SpellPassive(spell._gid)
 end
 function spellMeta:Pickup()
   PickupSpell(self._gid)
+end
+function spellMeta.Texture(spell)
+  return GetSpellTexture(spell._gid)
+end
+function spellMeta.SpecTexture(spell)
+  -- GetSpellTexture returns two values, one for the base spell and one for the override spell
+  return select(2, GetSpellTexture(spell._sid))
 end
 -- Flyout object factory
 
@@ -236,6 +260,7 @@ end
 -- Flyout object instances
 function flyoutMeta.__index(flyout, index)
   if "string" == type(index) then
+     -- call method (index) on the flyout object
     assert(flyoutMeta[index], index.." is not a known flyout method")
     if flyoutMeta._method[index] then
       LA:DebugPrint("FlyoutMeta "..index.."("..tostring(rawget(flyout, "_fid"))..")")
@@ -244,6 +269,7 @@ function flyoutMeta.__index(flyout, index)
       return flyoutMeta[index](flyout)
     end
   elseif "number" == type(index) then
+    -- get the spell number (index) from the flyout
     local globalID, isKnown = GetFlyoutSlotInfo(flyout._fid, index)
     if globalID then
       return LA.Spell.Global[globalID]
@@ -256,7 +282,6 @@ end
 function flyoutMeta.__eq(flyout1, flyout2)
   return flyout1._fid == flyout2._fid
 end
-
 function flyoutMeta.ID(flyout)
   return flyout._fid
 end
@@ -276,6 +301,7 @@ function flyoutMeta.Name(flyout)
   --local name, description, size, flyoutKnown = GetFlyoutInfo(flyoutID)
   return GetFlyoutInfo(flyout._fid) -- passes on only the first return value, which is the localized name
 end
+flyoutMeta.__tostring = flyoutMeta.Name
 function flyoutMeta.SubName(flyout)
   return ""
 end
@@ -286,9 +312,22 @@ function flyoutMeta.Known(flyout)
   --local name, description, size, flyoutKnown = GetFlyoutInfo(flyoutID)
   return select(4, GetFlyoutInfo(flyout._fid))
 end
+-- Pickup is a method, call as flyout:Pickup() rather than flyout.Pickup
 function flyoutMeta:Pickup()
   PickupSpellBookItem(self.Slot, BOOKTYPE_SPELL)
 end
 function flyoutMeta.Slot(flyout)
   return LA.flyoutCache[flyout._fid]
+end
+
+-- Usage: for spell in flyout.Spells do x y z end
+function flyoutMeta.Spells(flyout)
+  local size = flyout.Size
+  local index = 0
+  return function()
+    index = index + 1
+    if index <= size then
+      return flyout[index]
+    end
+  end
 end

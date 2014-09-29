@@ -91,9 +91,9 @@ function LA:CHAT_MSG_SYSTEM(message)
   end
   if t then
     local name, globalID = self:UnlinkSpell(str)
-    self:DebugPrint("Matched "..name, globalID)
-    t[globalID] = true
-    --t.link[globalID] = str
+    self:DebugPrint("Spam filter matched spell", name, globalID)
+    spell = self.Spell.Global[globalID]
+    tinsert(t, spell)
   else
     str = string.match(message, self.patterns.petLearnAbility) or string.match(message, self.patterns.petLearnSpell)
     if str then
@@ -101,12 +101,12 @@ function LA:CHAT_MSG_SYSTEM(message)
     else
       str = string.match(message, self.patterns.petUnlearnSpell)
       if str then
+        print("Unlearning pet spells is broken, yo")
         t = self.petUnlearned
       end
     end
     if t then
-      --spell, rank = unRankSpell(str)
-      self:DebugPrint("Matched "..str)
+      self:DebugPrint("Spam filter matched pet spell "..str)
       table.insert(t, str)
     end
   end
@@ -269,6 +269,7 @@ function LA:UNIT_SPELLCAST_STOP(unit, spellName, deprecated, counter, globalID)
   then
     self:DebugPrint("Talent swap completed")
     -- print("Retalenting completed!") -- DEBUG FIXME
+    self:Hide() -- anything currently displayed is likely no longer valid
     self:UpdateSpellBook() -- fixes bug: spec spells all pop up at end of retalenting process
     self.state.retalenting = false
     self:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")

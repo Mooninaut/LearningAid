@@ -171,6 +171,7 @@ function private:Wrap(name, f)
 end
 
 function LA:Debug(flag, newValue)
+  -- Flags are "CALL", "GET", "SET"
   -- TOOD: probably ought to redesign this
 	-- private.debug is the sum of the number of flags that are true
   local oldDebug = private.debug
@@ -202,14 +203,18 @@ function LA:Debug(flag, newValue)
     end
     setmetatable(LA, private.meta)
     LearningAid_DebugLog = { }
-    LearningAid_Saved.debugLog = LearningAid_DebugLog
+    if LearningAid_Saved then
+      LearningAid_Saved.debugLog = LearningAid_DebugLog
+    end
   elseif oldDebug > 0 and newDebug == 0 then -- we're turning debugging off
     setmetatable(LA, nil)
     for k, v in pairs(shadow) do
       LA[k] = shadow[k]
       shadow[k] = nil
     end
-    LearningAid_Saved.debugLog = nil
+    if LearningAid_Saved then
+      LearningAid_Saved.debugLog = nil
+    end
   end
 
   private.debug = newDebug

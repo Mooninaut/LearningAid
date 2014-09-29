@@ -90,17 +90,20 @@ function LA:MacroSpells(macroText)
             linePos = lineLast
             found = true
             self:DebugPrint('Token: "'..token..'"')
-            spells[token] = true
+            -- spells[token] = true
             -- not self:GetRealSpellBookItemInfo because the extra info is not needed,
             -- and <token> may contain strings like mount names that are not in the spellbook
             local status, globalID = GetSpellBookItemInfo(token)
-            if globalID then
-              spells[globalID] = true
-              local slot = FindSpellBookSlotBySpellID(globalID)
-              if slot then
-                -- handle spells that morph based on current spec
-                spells[select(2, self:UnlinkSpell(GetSpellLink(slot, BOOKTYPE_SPELL)))] = true
-              end
+            if (not status) and self.nameToGlobal[token] then 
+              status, globalID = "SPELL", self.nameToGlobal[token]
+            end
+            if "SPELL" == status then
+              local spell = self.Spell.Global[globalID]
+              spells[spell.ID] = true
+              spells[spell.SpecID] = true
+              self:DebugPrint("Adding "..tostring(spell))
+            else
+              self:DebugPrint("Status is "..tostring(status))
             end
           end
         end
@@ -208,7 +211,7 @@ function LA:FindMissingActions()
       --self:DebugPrint("Found globalID for spell "..actionID..'='..self.specSpellCache[actionID])
       local gID = spell.ID
       local sID = spell.SpecID
-      self:DebugPrint(self.name..":FindMissingActions() found spell "..actionID.."/"..gID.." / "..sID)
+      self:DebugPrint(self.name..":FindMissingActions() found spell "..actionID.."/"..gID.."/"..sID)
       spells[gID] = true
       spells[sID] = true
       
@@ -283,7 +286,6 @@ function LA:FindMissingActions()
         macroSpells[globalID]
       )
       then
-      -- CATA -- self:DebugPrint("Spell "..info.name.." Rank "..info.rank.." is not on any action bar.")
         self:DebugPrint("Spell "..globalID..' "'..spellName..'" is not on any action bar.')
       --if macroSpells[spellNameLower] then self:DebugPrint("Found spell in macro") end
         table.insert(results, spell)

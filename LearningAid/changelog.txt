@@ -1,3 +1,18 @@
+# 1.12a5
+
+Talents that override existing spells, like Strangulate/Asphyxiate now
+work correctly.
+
+Retalenting spam filter is working, and now does not display redundant
+entries for spells that are unlearned and then immediately relearned
+when Summarize is selected.
+
+Ignore list is still broken. Do not use.
+
+SpellAPI is more comprehensive and robust.
+
+Deleted a lot of old, commented-out code from previous expansions.
+
 # 1.12a4
 
 Mangle is working.

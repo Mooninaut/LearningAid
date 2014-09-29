@@ -1,4 +1,4 @@
-Learning Aid version 1.12 ALPHA 4
+Learning Aid version 1.12 ALPHA 5
 Compatible with World of Warcraft version 5.4.8
 Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
 Email: jamash.kj@gmail.com
