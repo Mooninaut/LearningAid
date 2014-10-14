@@ -36,7 +36,35 @@ for updates in the future.
 local addonName, private = ...
 local LA = private.LA
 
-LA.castSlashCommands = {
+local strLower = string.lower
+
+local castPrefixes = {
+  --"USE",
+  --"USERANDOM",
+  "CAST",
+  "CASTRANDOM",
+  "CASTSEQUENCE"
+}
+local castSlashCommands = { }
+-- build table of all /cast and similar macro command aliases
+for _, castPrefix in ipairs(castPrefixes) do
+  local str
+  local command
+  local index = 1
+  while true do
+    str = "SLASH_"..castPrefix..index
+    command = _G[str]
+    if not command then
+      break
+    end
+    command = strLower(command)
+    LA:DebugPrint("Cast Slash Command "..str.." = "..command)
+    castSlashCommands[command] = true
+    index = index + 1
+  end
+end
+LA.castSlashCommands = castSlashCommands
+--[[{
   [SLASH_USE1] = true,
   [SLASH_USE2] = true,
   [SLASH_USERANDOM1] = true,
@@ -49,13 +77,13 @@ LA.castSlashCommands = {
   [SLASH_CASTRANDOM2] = true,
   [SLASH_CASTSEQUENCE1] = true,
   [SLASH_CASTSEQUENCE2] = true
-}
+} ]]
 -- macroText is the text of a macro from the official Macro UI or an addon
 -- returns a table of spells found in the macro of the form
 -- { "spellName1" = true, spellGlobalID1 = true, "spellName2" = true, spellGlobalID2 = true, ...}
 -- spell names are all lower case, global ids are integers
 function LA:MacroSpells(macroText)
-  macroText = string.lower(macroText)
+  macroText = strLower(macroText)
   local spells = {}
   local first, last, line
   first, last, line = macroText:find("([^\n]+)[\n]?")
@@ -270,7 +298,7 @@ function LA:FindMissingActions()
     assert(spell, "Spell "..i.." doesn't exist!")
     if "SPELL" == spell.Status then
       local spellName = spell.Name
-      local spellNameLower = string.lower(spellName)
+      local spellNameLower = strLower(spellName)
       local globalID = spell.ID
       local specID = spell.SpecID
       if spell.Known and not (
