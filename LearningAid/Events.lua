@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 Events.lua is part of Learning Aid.
@@ -101,7 +101,7 @@ function LA:CHAT_MSG_SYSTEM(message)
     else
       str = string.match(message, self.patterns.petUnlearnSpell)
       if str then
-        print("Unlearning pet spells is broken, yo")
+        print("Unlearning pet spells is broken, yo: "..str)
         t = self.petUnlearned
       end
     end

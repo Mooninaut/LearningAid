@@ -2,7 +2,7 @@
 
 Learning Aid version 1.12 Beta 1
 Compatible with World of Warcraft version 6.0.2
-Learning Aid is copyright © 2008-2014 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 LearningAid.lua is part of Learning Aid.
@@ -239,9 +239,9 @@ function LA:Init()
   -- create lock button in the upper left corner of the frame
   local lockButton = CreateFrame("Button", nil, titleBar)
   self.lockButton = lockButton
-  lockButton:SetWidth(20)
-  lockButton:SetHeight(20)
-  lockButton:SetPoint("LEFT", titleBar, "LEFT", 15, 0)
+  lockButton:SetWidth(24)
+  lockButton:SetHeight(24)
+  lockButton:SetPoint("LEFT", titleBar, "LEFT", 18, -3)
   lockButton:SetNormalTexture("Interface/LFGFrame/UI-LFG-ICON-LOCK")
   lockButton:SetScript("OnClick", function() if self.saved.locked then self:Unlock() else self:Lock() end end)
   
@@ -297,7 +297,7 @@ function LA:Init()
         set = function(info, val) if val then self:Lock() else self:Unlock() end end,
         get = function(info) return self.saved.locked end,
         width = "full",
-        order = 1
+        order = 40
       },
       restoreactions = {
         name = self:GetText("restoreActions"),
@@ -306,7 +306,7 @@ function LA:Init()
         set = function(info, val) self.saved.restoreActions = val end,
         get = function(info) return self.saved.restoreActions end,
         width = "full",
-        order = 2
+        order = 30
       },
       filter = {
         name = self:GetText("showLearnSpam"),
@@ -331,7 +331,7 @@ function LA:Init()
           end
         end,
         get = function(info) return self.saved.filterSpam end,
-        order = 3
+        order = 20,
       },
       reset = {
         name = self:GetText("resetPosition"),
@@ -339,7 +339,7 @@ function LA:Init()
         type = "execute",
         func = "ResetFramePosition",
         --width = "full",
-        order = 4
+        order = 41
       },
       missing = {
         type = "group",
@@ -362,7 +362,7 @@ function LA:Init()
             set = function(info, val) self.saved.shapeshift = val end,
             get = function(info) return self.saved.shapeshift end,
             width = "full",
-            order = 3
+            order = 4
           },
           macros = {
             name = self:GetText("searchInsideMacros"),
@@ -371,24 +371,26 @@ function LA:Init()
             set = function(info, val) self.saved.macros = val end,
             get = function(info) return self.saved.macros end,
             width = "full",
-            order = 4
+            order = 3
           },
           ignore = {
             name = self:GetText("ignore"),
             desc = self:GetText("ignoreHelp"),
             type = "input",
             guiHidden = true,
-            set = "ChatCommandIgnore"
+            set = "ChatCommandIgnore",
+            order = 10
           },
           unignore = {
             name = self:GetText("unignore"),
             desc = self:GetText("unignoreHelp"),
             type = "input",
             guiHidden = true,
-            set = "ChatCommandUnignore"
+            set = "ChatCommandUnignore",
+            order = 11
           },
           unignoreall = {
-            order = 5,
+            order = 12,
             name = self:GetText("unignoreAll"),
             desc = self:GetText("unignoreAllHelp"),
             type = "execute",
@@ -411,8 +413,23 @@ function LA:Init()
         func = function() InterfaceOptionsFrame_OpenToCategory(self.optionsFrame) end,
         guiHidden = true
       },
+      copybar = {
+        name = self:GetText("copyActionBar"),
+        desc = self:GetText("copyActionBarHelp"),
+        guiHidden = true,
+        type = "input",
+        set = function (info, val) LA:CopyActionBar(val) end
+      },
+      pastebar = {
+        name = self:GetText("pasteActionBar"),
+        desc = self:GetText("pasteActionBarHelp"),
+        guiHidden = true,
+        type = "input",
+        set = function (info, val) LA:PasteActionBar(val) end
+      },
       advanced = {
         type = "group",
+        inline = true,
         name = self:GetText("advanced"),
         args = {
           framestrata = {
@@ -477,11 +494,11 @@ function LA:Init()
                 type = "execute",
                 func = function ()
                   local i = 1
-                  local spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
+                  local spellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
                   while spellName do
                     self:AddButton(self.Spell.Book[i])
                     i = i + 1
-                    spellName, spellRank = GetSpellBookItemName(i, BOOKTYPE_SPELL)
+                    spellName = GetSpellBookItemName(i, BOOKTYPE_SPELL)
                   end
                 end
               }
@@ -551,11 +568,10 @@ function LA:Init()
   end)
   ]]
   hooksecurefunc("SetCVar", function (cvar, value)
-    if cvar == nil then cvar = "" end
-    if value == nil then value = "" end
-    cvarLower = string.lower(cvar)
+    cvar = string.lower(tostring(cvar))
+    value = tostring(value)
     self:DebugPrint("SetCVar("..cvar..", "..value..")")
-    if cvarLower == "uiscale" or cvarLower == "useuiscale" then
+    if cvar == "uiscale" or cvar == "useuiscale" then
       self:AutoSetMaxHeight()
     end      
   end)
@@ -648,21 +664,21 @@ function LA:spellSpamFilter(chatFrame, event, message, ...)
   local spell
   local patterns = self.patterns
   if (self.saved.filterSpam ~= self.FILTER_SHOW_ALL) and (
-    (
-      self.state.untalenting or
-      self.state.retalenting or
-     (self.pendingTalentCount > 0) or
-     (self.saved.filterSpam == self.FILTER_SHOW_NONE) or
-      self.state.learning or
+    --(
+      --self.state.untalenting or
+      --self.state.retalenting or
+     --(self.pendingTalentCount > 0) or
+     --(self.saved.filterSpam == self.FILTER_SHOW_NONE) or
+      --self.state.learning or
 --      self.petLearning or
-      (self.pendingBuyCount > 0)
-    ) and (
+      --(self.pendingBuyCount > 0)
+    --) and (
       string.match(message, patterns.learnSpell) or 
       string.match(message, patterns.learnAbility) or
       string.match(message, patterns.learnPassive) or
-      string.match(message, patterns.unlearnSpell)
+      string.match(message, patterns.unlearnSpell) or
 --    )
-  ) or
+  --) or
     string.match(message, patterns.petLearnAbility) or
     string.match(message, patterns.petLearnSpell) or
     string.match(message, patterns.petUnlearnSpell)
@@ -755,7 +771,7 @@ function LA:UpgradeIgnoreList()
   end
 end
 function LA:Ignore(spell)
-  if "SPELL" == spell.status then
+  if "SPELL" == spell.Status then
     self.ignore[spell.ID] = true
   end
   -- FIXME FIXME FIXME -- do something with flyouts
@@ -824,10 +840,10 @@ function LA:IsIgnored(spell)
   --end
 end
 function LA:ToggleIgnore(spell)
-  if self:IsIgnored(spell.ID) then
-    self:Unignore(spell.ID)
+  if self:IsIgnored(spell) then
+    self:Unignore(spell)
   else
-    self:Ignore(spell.ID)
+    self:Ignore(spell)
   end
 end
 function LA:UnignoreAll()
