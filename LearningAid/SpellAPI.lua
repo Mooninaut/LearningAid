@@ -3,7 +3,7 @@
 Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
-Spell.lua is part of Learning Aid.
+SpellAPI.lua is part of Learning Aid.
 
   Learning Aid is free software: you can redistribute it and/or modify
   it under the terms of the GNU Lesser General Public License as

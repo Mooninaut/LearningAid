@@ -1,5 +1,10 @@
 Bugs:
 
+# 2015-06-23: Patch 6.2.0 release day
+
+Spam filter is busted. No messages show regardless of setting.
+INCORRECT: There is no more spam when changing specs! HALLELUJAH
+
 # 2015-01-05
 
 Ignore list savedvariables code mismatch with ignore list update code. Need to reconcile and possibly

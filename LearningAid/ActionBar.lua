@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright Â© 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 ActionBar.lua is part of Learning Aid.
@@ -185,9 +185,9 @@ function LA:FindMissingActions()
   local spells = {}
   local types = {}
   local subTypes = {}
-  local tracking = {}
-  local shapeshift = {}
-  local totem = {}
+  --local tracking = {}
+  --local shapeshift = {}
+  --local totem = {}
   local results = {}
   local macroSpells = {}
   local flyouts = {}
@@ -206,13 +206,14 @@ function LA:FindMissingActions()
   end
   ]]
   if (not self.saved.totem) and self.enClass == "SHAMAN" then
+    -- Treat all Totem spells as though already on an action bar.
     self:DebugPrint("Searching for totems")
     for totemType = 1, MAX_TOTEMS do
       local totemSpells = {GetMultiCastTotemSpells(totemType)}
       for index, globalID in ipairs(totemSpells) do
         -- name, rank, icon, cost, isFunnel, powerType, castTime, minRange, maxRange = GetSpellInfo(spell)
         --local totemName = GetSpellInfo(globalID)
-        totem[globalID] = true
+        spells[globalID] = true
         --self:DebugPrint("Found totem "..totemName)
       end
     end
@@ -284,12 +285,12 @@ function LA:FindMissingActions()
   end
   -- End Macaroon code
   if not self.saved.shapeshift then
-    -- Treat shapeshift forms as though already on a bar
+    -- Treat all Shapeshift/stance/presence/aspect spells as though already on an action bar
     local numForms = GetNumShapeshiftForms()
     for form = 1, numForms do
       local formTexture, formName, formIsCastable, formIsActive, globalID = GetShapeshiftFormInfo(form)
       assert(globalID)
-      shapeshift[globalID] = true
+      spells[globalID] = true
     end
   end
   for tab = 1, 2 do
@@ -309,8 +310,8 @@ function LA:FindMissingActions()
           spell.Passive or
           -- spell is not a tracking spell, or displaying tracking spells has been enabled
           --(not tracking[spellName]) and
-          shapeshift[globalID] or
-          totem[globalID] or
+          -- spells[globalID] or
+          -- totem[globalID] or
           macroSpells[spellNameLower] or
           macroSpells[globalID]
         )

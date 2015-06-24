@@ -1,8 +1,8 @@
 --[[
 
-Learning Aid version 1.12 Beta 1
-Compatible with World of Warcraft version 6.0.2
-Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
+Learning Aid version 1.12 Beta 3
+Compatible with World of Warcraft version 6.2.0
+Learning Aid is copyright Â© 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 LearningAid.lua is part of Learning Aid.
@@ -40,6 +40,12 @@ local addonName, private = ...
 private.debug = 0
 private.debugCount = 0
 private.debugLimit = 10000 -- how many lines of log to keep before deleting earliest line
+-- FIXME TODO -- Have a way to configure this
+private.debugWindow = ChatFrame6
+private.debugWindow:SetMaxLines(private.debugLimit)
+-- FIXME TODO --
+-- FIXME TODO --
+
 private.logAllEvents = false
 private.shadow = { }
 private.wrappers = { }
@@ -49,11 +55,11 @@ private.noLog = { -- do not log calls to these functions even when call logging 
   GetVisible = true,
   GetText = true,
   ListJoin = true,
+  UnlinkSpell = true,
+  RealSpellBookItemInfo = true
   --SpellInfo = true,
   --SpellBookInfo = true,
-  -- MOP -- PLAYER_GUILD_UPDATE = true,
-  -- MOP -- UpdateGuild = true,
-  -- PANDARIA -- COMPANION_UPDATE = true
+
 }
 
 local LA = { 
@@ -105,8 +111,10 @@ local LA = {
 --  petLearning = false,
   activatePrimarySpec = 63645, -- global spellID
   activateSecondarySpec = 63644, -- global spellID
-  racialSpell = 20549, -- War Stomp (Tauren)
-  racialPassiveSpell = 20550, -- Endurance (Tauren)
+  autoAttack = 6603, -- global spellID
+  autoShot = 75, -- global spellID
+  racialSpell = 20549, -- War Stomp (Tauren). Used to determine the subName text for racials.
+  racialPassiveSpell = 20550, -- Endurance (Tauren). Used to determine the subName text for racial passives.
   ridingSpells = {
     [33388] = true,  -- Apprentice (60% ground speed)
     [33391] = true,  -- Journeyman (100% ground speed)
@@ -285,7 +293,11 @@ function LA:Init()
       end
     end
   )
-
+  --[[
+  Due to lack of foresight, some options have negative implications.
+  shapeshift, if true, 
+  
+  ]]
   self.options = {
     handler = self,
     type = "group",
@@ -308,6 +320,7 @@ function LA:Init()
         width = "full",
         order = 30
       },
+--[[ No longer needed as of patch 6.2.0!
       filter = {
         name = self:GetText("showLearnSpam"),
         desc = self:GetText("showLearnSpamHelp"),
@@ -333,6 +346,7 @@ function LA:Init()
         get = function(info) return self.saved.filterSpam end,
         order = 20,
       },
+--]]
       reset = {
         name = self:GetText("resetPosition"),
         desc = self:GetText("resetPositionHelp"),
@@ -606,7 +620,7 @@ function LA:Init()
   local baseEvents = {
     "ACTIVE_TALENT_GROUP_CHANGED",
     "ADDON_LOADED",
-    "CHAT_MSG_SYSTEM",
+    -- DRAENOR 6.2 -- "CHAT_MSG_SYSTEM",
     -- PANDARIA -- "COMPANION_LEARNED",
     -- PANDARIA -- "COMPANION_UPDATE",
     "PET_TALENT_UPDATE",
@@ -655,13 +669,14 @@ function LA:Init()
     self.frame:SetFrameStrata(self.saved.frameStrata)
   end
 end
+--[[ No longer needed as of patch 6.2.0!
 
 -- this is a function
 function private.spellSpamFilter(...) return LA:spellSpamFilter(...) end
 
 -- this is a method
 function LA:spellSpamFilter(chatFrame, event, message, ...)
-  local spell
+  -- local spell -- unused
   local patterns = self.patterns
   if (self.saved.filterSpam ~= self.FILTER_SHOW_ALL) and (
     --(
@@ -690,7 +705,7 @@ function LA:spellSpamFilter(chatFrame, event, message, ...)
     return false, message, ... -- pass the message along
   end
 end
-
+--]]
 function LA:GetText(id, ...)
   if not id then
     if self.DebugPrint then
@@ -904,6 +919,7 @@ function LA:ProcessQueue()
     wipe(self.queue)
   end
 end
+-- Possibly obsolete as of 6.2.0
 function LA:FormatSpells(t)
   local str = ""
   for i, spell in ipairs(t) do
@@ -918,28 +934,37 @@ end
 local function spellCompare (a,b)
   return a.SpecName < b.SpecName
 end
+--[[ No longer needed as of patch 6.2.0!
+
 function LA:PrintPending()
   local learned = self.spellsLearned
   local unlearned = self.spellsUnlearned
+  self:DebugPrint('Learned '..(#learned)..', unlearned '..#unlearned)
   if self.saved.filterSpam == self.FILTER_SUMMARIZE then
     -- lots of work just to remove stuff that's unlearned and then immediately relearned
     if #learned > 0 and #unlearned > 0 then
+      self:DebugPrint('Removing duplicate spells')
       local spells = { }
       local learnedDupes = { }
       local unlearnedDupes = { }
-      local name
+      local specName
+      -- Create a lookup table of "SpellSpecName" = n for each index in 
+      -- LA.spellsLearned[] and LA.spellsUnlearned[]
       for index, spell in ipairs(learned) do
         spells[spell.SpecName] = index
       end
       for index, spell in ipairs(unlearned) do
-        name = spell.SpecName
-        if spells[name] then
-          tinsert(learnedDupes, spells[name])
-          tinsert(unlearnedDupes, index) -- do not disturb the table while traversing it
+        specName = spell.SpecName
+        if spells[specName] then
+          -- do not disturb the table while traversing it
+          tinsert(learnedDupes, spells[specName])
+          tinsert(unlearnedDupes, index)
         end
       end
+      -- Ensure the indices are in order
       table.sort(learnedDupes)
-      for i = #learnedDupes, 1, -1 do -- go backwards so later indices don't change when removing earlier elements
+      -- go backwards so later indices don't change when removing earlier elements
+      for i = #learnedDupes, 1, -1 do 
         tremove(learned, learnedDupes[i])
       end
       table.sort(unlearnedDupes)
@@ -972,7 +997,7 @@ function LA:PrintPending()
   wipe(self.spellsUnlearned)
   wipe(self.pendingTalents)
 end
-
+--]]
 
 function LA:OnShow()
   -- PANDARIA -- self:RegisterEvent("COMPANION_UPDATE", "OnEvent")

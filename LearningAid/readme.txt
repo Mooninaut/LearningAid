@@ -1,6 +1,6 @@
-Learning Aid version 1.12 Beta 2
-Compatible with World of Warcraft version 6.1.2
-Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
+Learning Aid version 1.12 Beta 3
+Compatible with World of Warcraft version 6.2.0
+Learning Aid is copyright Â© 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamash.kj@gmail.com
 
 === BEGIN LEGAL BOILERPLATE ===

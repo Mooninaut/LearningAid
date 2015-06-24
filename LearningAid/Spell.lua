@@ -1,6 +1,6 @@
 --[[
 
-Learning Aid is copyright © 2008-2015 Jamash (Kil'jaeden US Horde)
+Learning Aid is copyright Â© 2008-2015 Jamash (Kil'jaeden US Horde)
 Email: jamashkj@gmail.com
 
 Spell.lua is part of Learning Aid.
