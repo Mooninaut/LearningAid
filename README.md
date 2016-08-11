@@ -1,6 +1,9 @@
 # LearningAid
 A User Interface AddOn for World of Warcraft
 
+## Dependencies
+Learning Aid depends on the following [Ace3](https://www.wowace.com/addons/ace3/) modules: LibStub, CallbackHandler-1.0, AceGUI-3.0, AceConfig-3.0, and AceConsole-3.0. These must be placed in the "Libs" subfolder.
+
 ## What Learning Aid Does
 
 * Displays new spells/abilities when you level up or gain new abilities through other means.
